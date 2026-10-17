@@ -1,0 +1,194 @@
+/* Своё у острова — с префиксом alp-; карточки рисуют стили сайта (posts_style.css). */
+
+/* контейнер колонок — как #posts .posts-list в стилях сайта */
+.alp-list {
+  position: relative;
+  left: 10px;
+  width: var(--wrap-width);
+  margin: 0 auto;
+}
+@media screen and (max-width: 1300px) {
+  .alp-list {
+    left: 7px;
+  }
+}
+@media screen and (max-width: 600px) {
+  .alp-list {
+    left: 5px;
+  }
+}
+@media screen and (max-width: 500px) {
+  .alp-list {
+    left: 0;
+  }
+}
+
+/* лайк — как в комментариях: «пульс» сердца, цвет меняется плавно */
+.alp-heart {
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+  transform-origin: 50% 55%;
+}
+.alp-heart path {
+  transition: fill 0.2s ease-out;
+}
+.alp-heart-pulse {
+  animation: alp-pulse 0.4s ease-out;
+}
+@keyframes alp-pulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.7);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+article.post .post-counts li.likes span {
+  transition: color 0.2s ease-out;
+}
+
+/* заглушки карточек, пока грузится лента */
+.alp-skel {
+  --alp-skel-base: #e2e0d8;
+  --alp-skel-shine: #efede6;
+}
+.alp-skel .alp-skel-bar {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--alp-skel-base) 0%, var(--alp-skel-shine) 50%, var(--alp-skel-base) 100%) 0 0 / 300% 100%;
+  animation: alp-shimmer 1.4s ease-in-out infinite;
+}
+.alp-skel .post-head h2 {
+  display: flex;
+  justify-content: center;
+}
+.alp-skel .alp-skel-head {
+  width: 34%;
+  height: 10px;
+  /* на зелёной шапке сайта — светлая полупрозрачная полоса */
+  --alp-skel-base: rgba(255, 255, 255, 0.18);
+  --alp-skel-shine: rgba(255, 255, 255, 0.32);
+}
+.alp-skel-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 0 12px;
+}
+.alp-skel .alp-skel-av {
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.alp-skel-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+.alp-skel .alp-skel-small {
+  height: 9px;
+}
+.alp-skel .alp-skel-img {
+  width: 100%;
+  /* высота — из aspect-ratio ниже, а не общие 12px полосы */
+  height: auto;
+  border-radius: 0;
+}
+.alp-skel .alp-skel-img-h {
+  aspect-ratio: 290 / 210;
+}
+.alp-skel .alp-skel-img-v {
+  aspect-ratio: 3 / 4;
+}
+.alp-skel .alp-skel-title {
+  width: 70%;
+  height: 16px;
+  margin: 16px 12px 12px;
+}
+.alp-skel-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px;
+}
+.alp-skel-counts {
+  display: flex;
+  gap: 14px;
+  padding: 18px 15px 0;
+}
+.alp-skel-counts .alp-skel-bar {
+  width: 34px;
+  height: 20px;
+}
+@keyframes alp-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+.alp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* круг Ярмарки тщеславия «дорисовывается» при появлении (раньше — gsap в _story_circle_animate) */
+.alp-story-circle {
+  stroke-dashoffset: -524;
+  transform-box: view-box;
+  transform-origin: 45px 45px;
+  animation: alp-story 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes alp-story {
+  from {
+    stroke-dashoffset: -262;
+    transform: rotate(-180deg);
+  }
+  to {
+    stroke-dashoffset: -524;
+    transform: rotate(0deg);
+  }
+}
+
+.alp-sentinel {
+  height: 1px;
+}
+.alp-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 16px 40px;
+  color: #6b6a5e;
+  text-align: center;
+}
+.alp-retry {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--color-2, #e9aa44);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alp-story-circle,
+  .alp-skel .alp-skel-bar,
+  .alp-heart-pulse {
+    animation: none;
+  }
+}

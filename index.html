@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alterlit — лента постов (dev)</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- стили сайта (снимок, в git не попадает): карточки рисуются его классами -->
+    <link rel="stylesheet" href="/dev-fixtures/site.css" />
+    <style>
+      body { margin: 0; padding: 30px 0; background: var(--color-0, #fdf8ef); font-family: 'PT Serif', Helvetica, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="alterlit">
+      <section id="posts">
+        <div id="alterlit-posts" data-section="index"></div>
+      </section>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
