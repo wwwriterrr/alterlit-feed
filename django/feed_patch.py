@@ -133,7 +133,6 @@ get_category_html, scope_avatar.html, get_date). Имя с отметками, �
 а не Prefetch всех комментариев и лайков каждого поста ради len().
 """
 import html
-import json
 import re
 
 from django.db.models import Count
@@ -236,26 +235,21 @@ def _excerpt(p):
 
 
 # ── автор ──────────────────────────────────────────────────────────────────
-OWNER_ID = 79691    # шеф-редактор — своя отметка вместо «администратора»
-CHIEF_ID = 35717    # главред
-ADMIN_TITLE = 'Администратор проекта'
+CHIEF_EDITOR_ID = 79691  # шеф-редактор — красный значок
+OWNER_ID = 35717         # владелец сайта — свой значок (achieve_5)
+STAFF_TITLE = 'Администрация сайта'  # как в чате и комментариях
 
 
 def _author_marks(user):
-    """Отметки у имени — правила get_name_html, но данными: [{"kind", "title"}]."""
+    """Отметки у имени — данными: [{"kind", "title"}]. Подписи — как в чате и комментариях."""
     profile = getattr(user, 'profile', None)
     marks = []
-    if user.is_staff and user.id not in (OWNER_ID, CHIEF_ID):
-        title = ADMIN_TITLE
-        try:
-            title = json.loads(profile.settings or '{}').get('admin_achive_name') or ADMIN_TITLE
-        except Exception:
-            pass
-        marks.append({'kind': 'admin', 'title': title})
-    if user.id == OWNER_ID:
+    if user.id == CHIEF_EDITOR_ID:
         marks.append({'kind': 'chief_editor', 'title': 'Шеф-редактор'})
-    if user.id == CHIEF_ID:
-        marks.append({'kind': 'editor_in_chief', 'title': 'Главред'})
+    elif user.id == OWNER_ID:
+        marks.append({'kind': 'owner', 'title': 'Владелец сайта'})
+    elif user.is_staff:
+        marks.append({'kind': 'admin', 'title': STAFF_TITLE})
     if profile is not None and getattr(profile, 'profile_type', None) == 'CLOSED':
         marks.append({'kind': 'closed', 'title': 'Это закрытый аккаунт'})
     if any(g.name == 'antipod' for g in getattr(user, 'v2_groups', [])):

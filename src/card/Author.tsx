@@ -1,5 +1,5 @@
 import type { Author as AuthorT, MarkKind } from '../types';
-import { AdminMark, AntipodMark, ChiefMark, LockMark } from '../icons';
+import { AdminMark, AntipodMark, LockMark, OwnerMark } from '../icons';
 
 export const NO_AVATAR = '/assets/img/noavatar_3.png';
 
@@ -7,9 +7,12 @@ export const NO_AVATAR = '/assets/img/noavatar_3.png';
 const truncate = (s: string, n = 35) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
 
 const MARKS: Record<MarkKind, { cls: string; Icon: (p: { className?: string }) => React.JSX.Element }> = {
+  // is_staff — синий значок «Администрация сайта»
   admin: { cls: 'admin-mark', Icon: AdminMark },
+  // шеф-редактор — тот же значок, красный (цвет — стили сайта .udaff-mark)
   chief_editor: { cls: 'udaff-mark', Icon: AdminMark },
-  editor_in_chief: { cls: 'sgb-mark', Icon: ChiefMark },
+  // владелец сайта — свой значок (achieve_5)
+  owner: { cls: 'sgb-mark', Icon: OwnerMark },
   closed: { cls: 'closed-mark', Icon: LockMark },
   antipod: { cls: 'antipod-mark', Icon: AntipodMark },
 };

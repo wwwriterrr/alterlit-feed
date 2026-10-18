@@ -1,6 +1,6 @@
 // Ответ GET /api/v1/feed/ — только данные; всю разметку рисует остров.
 
-export type MarkKind = 'admin' | 'chief_editor' | 'editor_in_chief' | 'closed' | 'antipod';
+export type MarkKind = 'admin' | 'chief_editor' | 'owner' | 'closed' | 'antipod';
 
 export interface Author {
   id: number;
