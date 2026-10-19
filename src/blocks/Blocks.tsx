@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AnnouncementsBlock, Block, EarsBlock, Widget1Block } from '../types';
 import { formatDate, formatFullDate } from '../date';
 import { ArrowNext, Exclam } from '../icons';
 import { NO_AVATAR, displayName } from '../card/Author';
 import PostCard from '../card/PostCard';
-import Slider from './Slider';
 import Iod from './Iod';
 
 /**
@@ -124,22 +123,121 @@ function Announcements({ block }: { block: AnnouncementsBlock }) {
   );
 }
 
+/**
+ * «Нетленка» — случайные цитаты (ears). Вместо слайдера — карточка цитаты: крупная кавычка,
+ * текст, подпись «автор · текст». Цитаты сменяют друг друга плавно (сами — раз в 9 секунд,
+ * пока курсор не над блоком), листаются стрелками, точками и свайпом. Все цитаты лежат друг
+ * на друге в одной ячейке: высота блока — по самой длинной, раскладка ленты не прыгает.
+ * Свёрнутый на телефоне — кавычка и цитата одной строкой.
+ */
+const EARS_AUTOPLAY_MS = 9000;
+
 function Ears({ block }: { block: EarsBlock }) {
+  const t = useToggle();
+  const items = block.items;
+  const n = items.length;
+  const [index, setIndex] = useState(0);
+  const [hover, setHover] = useState(false);
+  const [tick, setTick] = useState(0); // любое действие — отсчёт автосмены заново
+  const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+  const go = (d: number) => {
+    setIndex((v) => (v + d + n) % n);
+    setTick((x) => x + 1);
+  };
+
+  useEffect(() => {
+    if (n < 2 || hover || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const id = window.setTimeout(() => setIndex((v) => (v + 1) % n), EARS_AUTOPLAY_MS);
+    return () => clearTimeout(id);
+  }, [n, hover, index, tick]);
+
   return (
-    <article className="post" id="post-ear">
+    <article className={`post toggle alp-ears${t.cls}`} id="post-ear">
+      <button type="button" className="alp-peek alp-peek--quote" onClick={t.open} aria-label="Нетленка. Развернуть">
+        <span className="alp-peek-mark" aria-hidden="true">
+          “
+        </span>
+        <span className="alp-peek-body">
+          <span className="alp-peek-label">Нетленка</span>
+          <span className="alp-peek-quote">{items[0]?.text}</span>
+        </span>
+        <PeekChevron />
+      </button>
       <div className="post-head">
-        <h2>СЛУЧАЙНЫЕ ЦИТАТЫ</h2>
+        {t.button}
+        <h2>НЕТЛЕНКА</h2>
       </div>
-      <Slider
-        itemClass="sl-item short"
-        slides={block.items.map((i) => (
-          <blockquote>
-            <a href={i.url}>
-              <span>{i.text}</span>
-            </a>
-          </blockquote>
-        ))}
-      />
+      <div className="alp-quotes toggle-d" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+        <div
+          className="alp-quotes-stage"
+          aria-roledescription="карусель"
+          aria-label="Цитаты"
+          onPointerDown={(e) => {
+            swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+          }}
+          onPointerUp={(e) => {
+            const s0 = swipe.current;
+            swipe.current = null;
+            if (!s0 || s0.id !== e.pointerId) return;
+            const dx = e.clientX - s0.x;
+            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(e.clientY - s0.y) * 1.5) go(dx < 0 ? 1 : -1);
+          }}
+        >
+          {items.map((q, k) => (
+            <figure key={q.url + k} className="alp-quote" data-active={k === index || undefined} aria-hidden={k !== index}>
+              <span className="alp-quote-mark" aria-hidden="true">
+                “
+              </span>
+              <blockquote>
+                <a href={q.url} tabIndex={k === index ? 0 : -1}>
+                  {q.text}
+                </a>
+              </blockquote>
+              {(q.author || q.title) && (
+                <figcaption>
+                  {q.author && <span className="alp-quote-author">{q.author}</span>}
+                  {q.author && q.title && ' · '}
+                  {q.title && (
+                    <a href={q.url} tabIndex={k === index ? 0 : -1}>
+                      {q.title}
+                    </a>
+                  )}
+                </figcaption>
+              )}
+            </figure>
+          ))}
+        </div>
+        {n > 1 && (
+          <div className="alp-quotes-nav">
+            <button type="button" className="alp-quotes-arrow" onClick={() => go(-1)} aria-label="Предыдущая цитата">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+            <span className="alp-quotes-dots">
+              {items.map((_, k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="alp-quotes-dot"
+                  data-active={k === index || undefined}
+                  aria-label={`Цитата ${k + 1}`}
+                  aria-current={k === index || undefined}
+                  onClick={() => {
+                    setIndex(k);
+                    setTick((x) => x + 1);
+                  }}
+                />
+              ))}
+            </span>
+            <button type="button" className="alp-quotes-arrow" onClick={() => go(1)} aria-label="Следующая цитата">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
     </article>
   );
 }
@@ -190,7 +288,6 @@ export function renderBlock(block: Block, i: number) {
     case 'pin':
       return <PostCard key={`pin-${block.post.id}`} card={block.post} />;
     default:
-      // widget2 — разметки в старой ленте нет (на главной сейчас не используется)
       return null;
   }
 }

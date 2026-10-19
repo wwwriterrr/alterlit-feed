@@ -35,6 +35,8 @@ export interface Poll {
   title: string;
   description: string;
   url: string;
+  /** голосование окончено — кнопка «Результаты» */
+  ended?: boolean;
 }
 
 export type PostStatus = 'draft' | 'published' | 'moderate' | 'profile' | 'rejected' | 'hidden';
@@ -93,7 +95,8 @@ export interface IodBlock {
 
 export interface EarsBlock {
   type: 'ears';
-  items: { url: string; text: string }[];
+  /** цитата, ссылка на пост; title и author — подпись «откуда» */
+  items: { url: string; text: string; title?: string; author?: string }[];
 }
 
 export interface Widget1Block {
@@ -104,21 +107,12 @@ export interface Widget1Block {
   more_count: number;
 }
 
-export interface Widget2Block {
-  type: 'widget2';
-  title: string;
-  url: string;
-  images: { id: number; src: string; href: string }[];
-  more_count: number;
-  instruction_url: string | null;
-}
-
 export interface PinBlock {
   type: 'pin';
   post: Card;
 }
 
-export type Block = AnnouncementsBlock | IodBlock | EarsBlock | Widget1Block | Widget2Block | PinBlock;
+export type Block = AnnouncementsBlock | IodBlock | EarsBlock | Widget1Block | PinBlock;
 
 export interface FeedPage {
   posts: Card[];

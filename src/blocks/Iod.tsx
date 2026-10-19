@@ -44,6 +44,14 @@ export default function Iod({ block }: { block: IodBlock }) {
   const n = items.length;
   const ids = items.map((i) => i.id);
   const touch = useCallback(() => setActivity((a) => a + 1), []);
+  // счётчик «2 / 4» виден при наведении; на телефоне (наведения нет) — коротко после действия
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (!activity) return;
+    setFlash(true);
+    const t = window.setTimeout(() => setFlash(false), 1500);
+    return () => clearTimeout(t);
+  }, [activity]);
 
   // активный слайд — по положению прокрутки (свайп, колесо, стрелки — всё через неё)
   useEffect(() => {
@@ -209,7 +217,7 @@ export default function Iod({ block }: { block: IodBlock }) {
           ))}
         </div>
         {n > 1 && (
-          <span className={s.counter} aria-hidden="true">
+          <span className={s.counter} data-flash={flash || undefined} aria-hidden="true">
             {index + 1} / {n}
           </span>
         )}

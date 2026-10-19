@@ -309,12 +309,15 @@ def _polls(posts):
     if not first:
         return {}
     from voting.models import voteQuestion
-    votes = {v.id: v for v in voteQuestion.objects.filter(id__in=set(first.values())).only('title', 'description')}
+    votes = {v.id: v for v in voteQuestion.objects.filter(id__in=set(first.values()))
+             .only('title', 'description', 'date_execute')}
     res = {}
     for post_id, vote_id in first.items():
         v = votes.get(vote_id)
         if v:
-            res[post_id] = {'id': v.id, 'title': v.title, 'description': v.description or '', 'url': v.get_url()}
+            # ended — голосование окончено: в карточке кнопка «Результаты» вместо «Голосовать»
+            res[post_id] = {'id': v.id, 'title': v.title, 'description': v.description or '', 'url': v.get_url(),
+                            'ended': v.is_execute}
     return res
 
 
@@ -529,7 +532,6 @@ from api.feed.cards import _author
 logger = logging.getLogger('alterlit')
 
 RE_WIDGET1 = re.compile(r'^widget1__(?P<ids>[^_]*)(?:__title:(?P<title>.*))?$')
-RE_WIDGET2 = re.compile(r'^widget2__(?P<slug>.+)$')
 RE_PIN = re.compile(r'^pin_post__(\d+)')
 
 
@@ -592,9 +594,17 @@ def _ears(sites):
         return None
     picked = random.sample(ids, min(EARS_LIMIT, len(ids)))
     # повторная проверка: за 15 минут цитату могли убрать, а пост — снять с публикации
-    posts = {p.id: p for p in _ears_queryset(sites).filter(id__in=picked).only('ear', 'status')}
+    posts = {p.id: p for p in (_ears_queryset(sites).filter(id__in=picked)
+                               .select_related('author', 'author__profile')
+                               .only('ear', 'status', 'title', 'author__username', 'author__profile__nickname'))}
     items = [
-        {'url': p.get_url(), 'text': Truncator(html.unescape(strip_tags(p.ear))).words(25)}
+        {
+            'url': p.get_url(),
+            'text': Truncator(html.unescape(strip_tags(p.ear))).words(25),
+            # откуда цитата — подпись под ней
+            'title': html.unescape(strip_tags(p.title or '')),
+            'author': ((getattr(p.author, 'profile', None) and p.author.profile.nickname) or p.author.username).strip(),
+        }
         for p in (posts.get(i) for i in picked) if p
     ]
     return {'type': 'ears', 'items': items} if len(items) > 1 else None
@@ -627,28 +637,6 @@ def _widget1(spec):
     }
 
 
-def _widget2(spec):
-    slug = RE_WIDGET2.match(spec).group('slug')
-    cat = Category.objects.filter(slug=slug).first()
-    if not cat:
-        return None
-    limit = 6
-    qs = PostImages.objects.filter(category__slug=slug).order_by('-id')
-    total = qs.count()
-    if total < limit:
-        return None
-    instruction = getattr(cat, 'instruction_post', None)
-    return {
-        'type': 'widget2',
-        'title': cat.title,
-        'url': reverse('archive', kwargs={'type': 'category', 'object_id': slug}),
-        'images': [{'id': i.id, 'src': i.full_webp_url,
-                    'href': reverse('archive', kwargs={'type': 'image', 'object_id': i.id})} for i in qs[:limit]],
-        'more_count': total - limit,
-        'instruction_url': reverse('post_api', kwargs={'post_id': instruction}) if instruction else None,
-    }
-
-
 def _pin(spec, mode, sites, user):
     from api.feed.cards import cards
     from api.feed.sections import cards_queryset
@@ -676,12 +664,10 @@ def index_blocks(mode, sites, user):
                 block = _ears(sites)
             elif RE_WIDGET1.match(spec):
                 block = _widget1(spec)
-            elif RE_WIDGET2.match(spec):
-                block = _widget2(spec)
             elif RE_PIN.match(spec):
                 block = _pin(spec, mode, sites, user)
             else:
-                block = None  # voting__, voting_post__ — перенесём вместе с главной AltCG
+                block = None  # voting__, voting_post__ — в живом шаблоне не выводятся
             if block:
                 blocks.append(block)
         except Exception:

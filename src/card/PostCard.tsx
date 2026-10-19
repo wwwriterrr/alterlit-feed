@@ -434,8 +434,8 @@ export default function PostCard({ card }: { card: Card }) {
             {/* «Голосовать» — надпись рисуют стили сайта (.pp-btn::before); окно голосования — в острове */}
             <button
               type="button"
-              className="pp-btn"
-              aria-label="Голосовать"
+              className={`pp-btn${card.poll.ended ? ' alp-ended' : ''}`}
+              aria-label={card.poll.ended ? 'Результаты голосования' : 'Голосовать'}
               onClick={() => dialogs.open({ kind: 'vote', voteId: card.poll!.id })}
             />
           </div>

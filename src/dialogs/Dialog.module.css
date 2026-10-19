@@ -229,6 +229,57 @@
   word-break: break-all;
   cursor: pointer;
 }
+.link {
+  gap: 10px;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+}
+.link:hover {
+  border-color: #e9aa44;
+}
+.link[data-copied] {
+  border-color: #619b63;
+  background: #eef6ec;
+}
+.linkUrl {
+  flex: 1;
+  min-width: 0;
+  user-select: all;
+}
+.linkState {
+  flex: none;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  color: #8a8578;
+}
+.link[data-copied] .linkState {
+  color: #3f7d42;
+  animation: copied 0.3s ease-out;
+}
+.linkState svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes copied {
+  from {
+    transform: scale(0.4);
+  }
+}
+.linkHint[data-state='copied'] {
+  color: #3f7d42 !important;
+  font-style: normal !important;
+  font-weight: bold;
+}
+.linkHint[data-state='failed'] {
+  color: #8c3a31 !important;
+}
 .linkHint {
   margin: 4px 0 6px !important;
   color: #898989;

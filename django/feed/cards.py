@@ -60,12 +60,15 @@ def _polls(posts):
     if not first:
         return {}
     from voting.models import voteQuestion
-    votes = {v.id: v for v in voteQuestion.objects.filter(id__in=set(first.values())).only('title', 'description')}
+    votes = {v.id: v for v in voteQuestion.objects.filter(id__in=set(first.values()))
+             .only('title', 'description', 'date_execute')}
     res = {}
     for post_id, vote_id in first.items():
         v = votes.get(vote_id)
         if v:
-            res[post_id] = {'id': v.id, 'title': v.title, 'description': v.description or '', 'url': v.get_url()}
+            # ended — голосование окончено: в карточке кнопка «Результаты» вместо «Голосовать»
+            res[post_id] = {'id': v.id, 'title': v.title, 'description': v.description or '', 'url': v.get_url(),
+                            'ended': v.is_execute}
     return res
 
 

@@ -89,6 +89,14 @@
   line-height: 1.3;
   letter-spacing: 0.5px;
   pointer-events: none;
+  /* не закрывает картинку: виден при наведении, фокусе и коротко после свайпа/переключения */
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.stage:hover .counter,
+.track:focus-visible ~ .counter,
+.counter[data-flash] {
+  opacity: 1;
 }
 
 .controls {
@@ -203,6 +211,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .counter,
   .arrow,
   .thumb,
   .thumb::after {
