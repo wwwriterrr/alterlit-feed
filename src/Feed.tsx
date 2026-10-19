@@ -68,18 +68,32 @@ export default function Feed({ section }: { section: string }) {
         )}
         {isError && (
           <div className="alp-status" role="alert">
-            {'status' in (error ?? {}) && (error as { status: unknown }).status === 404
-              ? 'Этот раздел пока открывается в старой ленте.'
-              : 'Не удалось загрузить публикации.'}{' '}
-            <button type="button" className="alp-retry" onClick={() => (pages.length ? fetchNextPage() : refetch())}>
-              Повторить
-            </button>
+            {errorMessage(error, section)}{' '}
+            {(error as { status?: unknown } | undefined)?.status !== 404 && (
+              <button type="button" className="alp-retry" onClick={() => (pages.length ? fetchNextPage() : refetch())}>
+                Повторить
+              </button>
+            )}
           </div>
         )}
         {!isLoading && !isError && !hasNextPage && pages.length > 0 && !posts.length && (
-          <div className="alp-status">Публикаций пока нет</div>
+          <div className="alp-status">{isReviews(section) ? 'Рецензий пока нет' : 'Публикаций пока нет'}</div>
         )}
       </DialogsProvider>
     </FeedContext.Provider>
   );
+}
+
+const isReviews = (section: string) => section.startsWith('reviews:') || section.endsWith(':reviews');
+
+/** 404 от ленты: not_found — нет рубрики / публикации / пользователя; not_migrated — раздел ещё в старой ленте. */
+function errorMessage(error: unknown, section: string) {
+  const e = error as { status?: unknown; data?: { code?: string } } | undefined;
+  if (e?.status === 404) {
+    if (e.data?.code !== 'not_found') return 'Этот раздел пока открывается в старой ленте.';
+    if (section.startsWith('reviews:')) return 'Публикация не найдена.';
+    if (section.startsWith('profile:')) return 'Пользователь не найден.';
+    return 'Такой рубрики нет.';
+  }
+  return 'Не удалось загрузить публикации.';
 }

@@ -7,8 +7,10 @@
 """
 import html
 import logging
+import random
 import re
 
+from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone as tz
 from django.utils.html import strip_tags
@@ -61,9 +63,33 @@ def _iod(mode):
     } for i in items]}
 
 
+EARS_LIMIT = 6
+EARS_IDS_TTL = 15 * 60  # список постов с цитатами пересобирается раз в 15 минут
+
+
+def _ears_queryset(sites):
+    # ear__gt='' отсекает и пустую строку, и NULL (exclude(ear='') пропустил бы NULL)
+    return Post.objects.filter(site__in=sites, status='published', ear__gt='')
+
+
 def _ears(sites):
-    ears = Post.objects.filter(site__in=sites, status='published').exclude(ear='').only('ear', 'status').order_by('?')[:6]
-    items = [{'url': p.get_url(), 'text': Truncator(html.unescape(strip_tags(p.ear))).words(25)} for p in ears]
+    """Случайные цитаты. Без ORDER BY RAND() (перебор всех опубликованных на каждый заход главной):
+    id постов с цитатой — из кэша на 15 минут, 6 случайных выбираются в Python и забираются по pk.
+    Цитату, которую администратор добавил только что, блок покажет после обновления кэша."""
+    key = 'feed:ears_ids:' + ','.join(sorted(sites))
+    ids = cache.get(key)
+    if ids is None:
+        ids = list(_ears_queryset(sites).values_list('id', flat=True))
+        cache.set(key, ids, EARS_IDS_TTL)
+    if len(ids) < 2:
+        return None
+    picked = random.sample(ids, min(EARS_LIMIT, len(ids)))
+    # повторная проверка: за 15 минут цитату могли убрать, а пост — снять с публикации
+    posts = {p.id: p for p in _ears_queryset(sites).filter(id__in=picked).only('ear', 'status')}
+    items = [
+        {'url': p.get_url(), 'text': Truncator(html.unescape(strip_tags(p.ear))).words(25)}
+        for p in (posts.get(i) for i in picked) if p
+    ]
     return {'type': 'ears', 'items': items} if len(items) > 1 else None
 
 

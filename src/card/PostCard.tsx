@@ -3,6 +3,7 @@ import type { Card, Viewer } from '../types';
 import { formatDate, formatFullDate, formatStamp, isFuture } from '../date';
 import { ArrowNext, Comment, CreativeMarket, Ellipsis, Like, Review } from '../icons';
 import { PostAvatar, UserName } from './Author';
+import RollingNumber from './RollingNumber';
 import { useDialogs } from '../dialogs/DialogsProvider';
 import { useFeedContext } from '../FeedContext';
 import { isAuthError, useLikeMutation, useToggleHiddenMutation } from '../api';
@@ -131,7 +132,9 @@ function Counts({ card, toggleCls }: { card: Card; toggleCls: string }) {
         onClick={onLike}
       >
         <LikeHeart liked={liked} />
-        <span>{likes || ''}</span>
+        <span>
+          <RollingNumber value={likes} />
+        </span>
       </li>
       <li
         className={`comments${comments ? ' commented' : ''}`}
@@ -157,64 +160,133 @@ function Counts({ card, toggleCls }: { card: Card; toggleCls: string }) {
   );
 }
 
-/** «Сохранить в избранное» — на сайте пока только анимация, без запроса; повторяем как есть. */
-function FavButton() {
-  const [state, setState] = useState<'' | 'load' | 'success' | 'remove'>('');
-  const timers = useRef<number[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const click = () => {
-    setState('load');
-    timers.current.push(
-      window.setTimeout(() => {
-        setState('success');
-        timers.current.push(window.setTimeout(() => setState('remove'), 1000));
-      }, 1000),
-    );
-  };
-  return <button type="button" className={`post-mbtn post-add-fav${state ? ' ' + state : ''}`} onClick={click} />;
+/** Крестик закрытия меню (залитый контур — цвет задают стили сайта, как у «…»). */
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z" />
+  </svg>
+);
+
+/** Какие статусы автор может править сам (post_api edit): черновик, «в профиле», на модерации. */
+const AUTHOR_EDITABLE = new Set(['draft', 'profile', 'moderate']);
+
+/** Иконки пунктов меню — простые контуры, цвет от текста. */
+const MENU_ICONS = {
+  share: 'M14 5l6 6-6 6M20 11H9a5 5 0 0 0-5 5v3',
+  hide: 'M3 12s3.5-6 9-6c2 0 3.7.8 5 1.8M21 12s-3.5 6-9 6c-2 0-3.7-.8-5-1.8M4 4l16 16',
+  show: 'M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+  edit: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
+  remove: 'M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13',
+  report: 'M5 21V4h11l-1.5 4L16 12H5',
+} as const;
+
+function MenuItem({
+  icon,
+  danger,
+  href,
+  disabled,
+  onClick,
+  children,
+}: {
+  icon: keyof typeof MENU_ICONS;
+  danger?: boolean;
+  href?: string;
+  disabled?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  const cls = `alp-menu-item${danger ? ' alp-menu-item--danger' : ''}`;
+  const inner = (
+    <>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d={MENU_ICONS[icon]} />
+      </svg>
+      <span>{children}</span>
+    </>
+  );
+  return href ? (
+    <a className={cls} href={href} role="menuitem">
+      {inner}
+    </a>
+  ) : (
+    <button type="button" className={cls} role="menuitem" disabled={disabled} onClick={onClick}>
+      {inner}
+    </button>
+  );
 }
 
+/**
+ * Меню «…» карточки — поверх размытой карточки.
+ *   гость и вошедший — поделиться, пожаловаться;
+ *   автор — поделиться, скрыть, редактировать (черновик, «в профиле», на модерации), удалить;
+ *   is_staff на чужом посте — как вошедший, плюс отдельный блок «Администратор»:
+ *   редактировать, скрыть, удалить (по правам Django). На своём посте у staff — набор автора.
+ */
 function MoreMenu({ card, viewer, onDone }: { card: Card; viewer: Viewer; onDone: () => void }) {
   const { section } = useFeedContext();
   const { open: openDialog } = useDialogs();
   // окно открылось — меню закрываем
   const dialogs = { open: (...a: Parameters<typeof openDialog>) => (onDone(), openDialog(...a)) };
   const [toggleHidden, { isLoading: hiding }] = useToggleHiddenMutation();
-  const own = viewer.id === card.author.id;
+  const own = viewer.id !== null && viewer.id === card.author.id;
+  const admin = viewer.is_staff && !own;
+  const editable = !NO_EDIT.has(card.post_type);
+  const hidden = card.status === 'hidden';
+  const hide = () => toggleHidden({ id: card.id, hidden, section });
+  const editHref = `/post/edit/?id=${card.id}`;
+  const remove = () => dialogs.open({ kind: 'delete', card });
+
   return (
-    <div className="post-more-wrap">
-      <button type="button" className="post-mbtn post-share" onClick={() => dialogs.open({ kind: 'share', card })}>
-        Поделиться
-      </button>
-      {viewer.id && <FavButton />}
-      {viewer.can_change && !NO_EDIT.has(card.post_type) && (
-        <a className="post-mbtn" href={`/post/edit/?id=${card.id}`}>
-          Редактировать{!own && ' (админ)'}
-        </a>
-      )}
-      <button
-        type="button"
-        className="post-mbtn post-compl red"
-        data-post_id={card.id}
-        // гость тоже может пожаловаться — указывает email, как в старом окне поддержки
-        onClick={() => dialogs.open({ kind: 'complaint', card })}
-      >
-        Пожаловаться
-      </button>
-      {(own || viewer.can_delete) && (
-        <button type="button" className="post-mbtn post-remove red" onClick={() => dialogs.open({ kind: 'delete', card })}>
-          Удалить{!own && ' (админ)'}
-        </button>
-      )}
-      {viewer.can_hide && (
-        <button
-          type="button"
-          className={`post-mbtn post-hide${hiding ? ' load' : ''}`}
-          data-postid={card.id}
-          data-status={card.status}
-          disabled={hiding}
-          onClick={() => toggleHidden({ id: card.id, hidden: card.status === 'hidden', section })}
-        />
+    <div className="post-more-wrap alp-more" role="menu" aria-label="Действия с публикацией">
+      <div className="alp-menu">
+        <MenuItem icon="share" onClick={() => dialogs.open({ kind: 'share', card })}>
+          Поделиться
+        </MenuItem>
+        {own && (
+          <>
+            <MenuItem icon={hidden ? 'show' : 'hide'} disabled={hiding} onClick={hide}>
+              {hidden ? 'Показать публикацию' : 'Скрыть публикацию'}
+            </MenuItem>
+            {editable && (viewer.can_change || AUTHOR_EDITABLE.has(card.status)) && (
+              <MenuItem icon="edit" href={editHref}>
+                Редактировать
+              </MenuItem>
+            )}
+            {/* заказ Creative Market автор сам не удаляет — только через поддержку */}
+            {(!card.flags.from_cm || viewer.can_delete) && (
+              <MenuItem icon="remove" danger onClick={remove}>
+                Удалить
+              </MenuItem>
+            )}
+          </>
+        )}
+        {!own && (
+          // гость тоже может пожаловаться — указывает email, как в старом окне поддержки
+          <MenuItem icon="report" danger onClick={() => dialogs.open({ kind: 'complaint', card })}>
+            Пожаловаться
+          </MenuItem>
+        )}
+      </div>
+
+      {admin && (viewer.can_change || viewer.can_delete) && (
+        <div className="alp-menu alp-menu--admin" role="group" aria-label="Действия администратора">
+          <div className="alp-menu-title">Администратор</div>
+          {viewer.can_change && editable && (
+            <MenuItem icon="edit" href={editHref}>
+              Редактировать (админ)
+            </MenuItem>
+          )}
+          {viewer.can_change && (
+            <MenuItem icon={hidden ? 'show' : 'hide'} disabled={hiding} onClick={hide}>
+              {hidden ? 'Показать (админ)' : 'Скрыть (админ)'}
+            </MenuItem>
+          )}
+          {viewer.can_delete && (
+            <MenuItem icon="remove" danger onClick={remove}>
+              Удалить (админ)
+            </MenuItem>
+          )}
+        </div>
       )}
     </div>
   );
@@ -227,14 +299,21 @@ export default function PostCard({ card }: { card: Card }) {
   const [more, setMore] = useState(false);
   const ref = useRef<HTMLElement>(null);
 
-  // меню «…» закрывается кликом мимо карточки
+  // меню «…» закрывается кликом мимо карточки и Esc
   useEffect(() => {
     if (!more) return;
     const close = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setMore(false);
     };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMore(false);
+    };
     document.addEventListener('click', close, true);
-    return () => document.removeEventListener('click', close, true);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('click', close, true);
+      document.removeEventListener('keydown', esc);
+    };
   }, [more]);
 
   const toggle = !!card.toggle;
@@ -314,12 +393,13 @@ export default function PostCard({ card }: { card: Card }) {
           {card.status !== 'draft' && <Counts card={card} toggleCls={t('toggle-d-f')} />}
           <button
             type="button"
-            className={`post-more-ctrl${t('toggle-d-f')}`}
-            aria-label="Ещё"
+            className={`post-more-ctrl alp-ctrl${t('toggle-d-f')}`}
+            aria-label={more ? 'Закрыть меню' : 'Действия с публикацией'}
             aria-expanded={more}
             onClick={() => setMore((v) => !v)}
           >
-            <Ellipsis />
+            {/* открыто меню — вместо «…» крестик */}
+            {more ? <CloseIcon /> : <Ellipsis />}
           </button>
           <MoreMenu card={card} viewer={viewer} onDone={() => setMore(false)} />
         </>

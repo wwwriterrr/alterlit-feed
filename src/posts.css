@@ -145,6 +145,188 @@ article.post .post-counts li.likes span {
   white-space: nowrap;
 }
 
+/* Меню «…» карточки: вместо градиента сайта — размытая сама карточка, кнопки списком */
+article.post .post-more-wrap.alp-more {
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 12px 58px; /* снизу — место под кнопку «…» */
+  overflow-y: auto;
+  background: rgba(237, 236, 232, 0.5);
+  background-image: none;
+  -webkit-backdrop-filter: blur(7px) saturate(0.9);
+  backdrop-filter: blur(7px) saturate(0.9);
+  animation: alp-menu-in 0.15s ease-out;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  article.post .post-more-wrap.alp-more {
+    background: rgba(237, 236, 232, 0.94);
+  }
+}
+@keyframes alp-menu-in {
+  from {
+    opacity: 0;
+  }
+}
+.alp-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  border-radius: 12px;
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 6px 20px rgba(32, 48, 25, 0.16);
+  animation: alp-menu-up 0.18s ease-out;
+}
+@keyframes alp-menu-up {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+article.post .alp-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  color: #1e2618;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+article.post .alp-menu-item + .alp-menu-item {
+  border-top: 1px solid #efe9dc;
+}
+article.post .alp-menu-item:hover {
+  background: #f5efe2;
+}
+article.post .alp-menu-item:focus-visible {
+  outline: 2px solid var(--color-2, #e9aa44);
+  outline-offset: -2px;
+}
+article.post .alp-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+article.post .alp-menu-item svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+}
+article.post .alp-menu-item--danger {
+  color: #b5524a;
+}
+/* кнопка «…»: при открытом меню — крестик в светлом круге (поворот сайта ей не нужен) */
+article.post.more .post-more-ctrl.alp-ctrl {
+  transform: none;
+  border-radius: 50%;
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 2px 10px rgba(32, 48, 25, 0.18);
+}
+article.post.more .post-more-ctrl.alp-ctrl svg {
+  width: 22px;
+  height: 22px;
+  animation: alp-ctrl-in 0.18s ease-out;
+}
+article.post.more .post-more-ctrl.alp-ctrl svg path {
+  fill: #1e2618;
+}
+@keyframes alp-ctrl-in {
+  from {
+    transform: rotate(-90deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* действия администратора — отдельный блок с синей пометкой, как значок администрации */
+.alp-menu--admin {
+  background: rgba(247, 249, 255, 0.97);
+  box-shadow:
+    0 6px 20px rgba(32, 48, 25, 0.16),
+    inset 0 0 0 1px rgba(59, 110, 243, 0.22);
+}
+.alp-menu-title {
+  padding: 7px 14px 5px;
+  color: #3b6ef3;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.alp-menu--admin .alp-menu-title + .alp-menu-item {
+  border-top: 1px solid rgba(59, 110, 243, 0.14);
+}
+
+/* счётчик лайков «барабаном»: старая и новая цифры в одной ячейке, ячейка обрезает лишнее.
+   Селекторы с префиксом сайта — его «article.post .post-counts li span» весит больше классов. */
+/* высота ячейки — ровно строка текста (1lh), как у соседних счётчиков: число не прыгает */
+article.post .post-counts li span.alp-roll {
+  display: inline-flex;
+  align-items: flex-start;
+  vertical-align: top;
+}
+article.post .post-counts li span.alp-digit {
+  display: inline-grid;
+  height: 1.3em;
+  height: 1lh;
+  overflow: hidden;
+}
+article.post .post-counts li span.alp-digit > span {
+  display: block;
+  grid-area: 1 / 1;
+}
+.alp-digit-in,
+.alp-digit-out {
+  animation: 0.32s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+/* больше: новая сверху вниз, старая уходит вниз */
+.alp-digit--up .alp-digit-in {
+  animation-name: alp-from-top;
+}
+.alp-digit--up .alp-digit-out {
+  animation-name: alp-to-bottom;
+}
+/* меньше: новая снизу вверх, старая уходит вверх */
+.alp-digit--down .alp-digit-in {
+  animation-name: alp-from-bottom;
+}
+.alp-digit--down .alp-digit-out {
+  animation-name: alp-to-top;
+}
+@keyframes alp-from-top {
+  from {
+    transform: translateY(-100%);
+  }
+}
+@keyframes alp-to-bottom {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes alp-from-bottom {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes alp-to-top {
+  to {
+    transform: translateY(-100%);
+  }
+}
+
 /* круг Ярмарки тщеславия «дорисовывается» при появлении (раньше — gsap в _story_circle_animate) */
 .alp-story-circle {
   stroke-dashoffset: -524;
@@ -186,8 +368,15 @@ article.post .post-counts li.likes span {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .alp-digit-out {
+    display: none;
+  }
   .alp-story-circle,
+  .alp-digit-in,
   .alp-skel .alp-skel-bar,
+  article.post .post-more-wrap.alp-more,
+  .alp-menu,
+  article.post.more .post-more-ctrl.alp-ctrl svg,
   .alp-heart-pulse {
     animation: none;
   }

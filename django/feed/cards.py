@@ -224,13 +224,14 @@ def cards(posts, mode, sites, user, pinned=False):
 
 
 def viewer(user):
-    """Права смотрящего — для меню карточки (как accept_change/accept_delete/accept_add в шаблоне)."""
+    """Права смотрящего — для меню карточки. is_staff — блок «действия администратора» на чужих
+    постах; can_change / can_delete — права Django, которые проверяют ручки правки и удаления."""
     if not user or not user.is_authenticated:
-        return {'id': None, 'can_change': False, 'can_delete': False, 'can_add': False, 'can_hide': False}
+        return {'id': None, 'is_staff': False, 'can_change': False, 'can_delete': False, 'can_add': False}
     return {
         'id': user.id,
+        'is_staff': bool(user.is_staff),
         'can_change': user.has_perm('blog.change_post'),
         'can_delete': user.has_perm('blog.delete_post'),
         'can_add': user.has_perm('blog.add_post'),
-        'can_hide': user.id == 1,  # как в шаблоне: кнопка «скрыть» только у id 1
     }

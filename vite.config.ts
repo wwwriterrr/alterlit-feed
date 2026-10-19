@@ -68,7 +68,11 @@ function feedFixture(): Plugin {
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const backend = (env.BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-  const devCookie = env.DEV_COOKIE || '';
+  // DEV_AS=admin — запросы идут с сессией администратора (DEV_COOKIE_ADMIN), иначе — обычного
+  // пользователя (DEV_COOKIE). Vite перезапускается сам, когда меняется .env.local.
+  const asAdmin = env.DEV_AS === 'admin' && Boolean(env.DEV_COOKIE_ADMIN);
+  const devCookie = (asAdmin ? env.DEV_COOKIE_ADMIN : env.DEV_COOKIE) || '';
+  if (command === 'serve' && devCookie) console.log(`  dev-сессия: ${asAdmin ? 'администратор' : 'пользователь'}`);
   const csrf = /(?:^|;\s*)csrftoken=([^;]+)/.exec(devCookie)?.[1];
 
   const proxy = (ws = false): ProxyOptions => ({

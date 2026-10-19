@@ -1,12 +1,26 @@
 # Лента постов v2 — остров React (главная, затем рубрики и разделы). Бэк — api/feed/, параллельно
 # старому (archive POST method=get-posts, postinger, Post.get_posts не трогаем).
 #
-# Этап 1: главная Альтерлита.
+# Перенесено: главная Альтерлита, Литпоток, рубрики (в том числе «Конкурсы» целиком), рецензии на
+# публикацию, лента профиля и рецензии профиля.
 #
 #   GET /api/v1/feed/?section=index               — первая страница + блоки над лентой + права смотрящего
 #   GET /api/v1/feed/?section=index&before=<id>   — следующая (id последнего показанного поста)
-#       → {"posts": [...], "more": bool, "blocks": [...] (только на первой), "viewer": {...}}
-#   Сайт — request.mode; раздел, который ещё не перенесён (главная AltCG и др.), — 404.
+#   GET /api/v1/feed/?section=category:litpotok   — Литпоток (/archive/category/litpotok/): стихи и проза
+#   GET /api/v1/feed/?section=category:<slug>     — рубрика /archive/category/<slug>/;
+#                                                   category:konkursy — все подрубрики «Конкурсов»
+#   GET /api/v1/feed/?section=reviews:<post_id>   — рецензии на публикацию (/archive/reviews/<id>/)
+#   GET /api/v1/feed/?section=profile:<username>  — публикации пользователя (/profile/<username>/):
+#       свой профиль — все статусы, кроме «отказано», и отложенные; is_staff в чужом — «опубликовано»,
+#       «в профиле», «на модерации», «скрыта» (и отложенные); остальные — «опубликовано», «в профиле».
+#       Рецензий в этой ленте нет.
+#   GET /api/v1/feed/?section=profile:<username>:reviews — рецензии пользователя (?posts=reviews):
+#       «опубликовано» и «опубликовано в профиле» для всех.
+#       → {"posts": [...], "more": bool, "viewer": {...},
+#          на первой странице: "blocks": [...] (главная), "section": {"name", "title"}}
+#   Сайт — request.mode. 404 {"code": "not_migrated"} — раздел ещё не перенесён (главная AltCG и др.);
+#   404 {"code": "not_found"} — рубрики нет, она другого сайта или картиночная (/archive/images/);
+#   нет публикации (рецензии) или пользователя (профиль).
 #
 # Отличия от старого:
 #   • правила разделов — в одном месте (sections.py), а не ветками postinger/get_posts;
@@ -20,6 +34,12 @@
 #   • только данные, без HTML: старые get_name_html, get_category_html, scope_avatar.html, get_date,
 #     get_excerpt не вызываются. Их правила перенесены сюда (отметки у имени, фильтр рубрик) и на
 #     клиент (вид имени, круг Ярмарки тщеславия, «Сегодня в 11:55» из ISO-даты).
+#   • случайные цитаты (ears) — без ORDER BY RAND(): список id постов с цитатой кэшируется на
+#     15 минут (Django cache), 6 случайных выбираются в Python и забираются по pk; ear__gt=''
+#     вместо exclude(ear='') — пустые NULL-цитаты не попадут. Если в CACHES стоит DummyCache,
+#     список будет собираться на каждый заход, как раньше.
+#
+# Права смотрящего (viewer): id, is_staff, can_change, can_delete, can_add (can_hide больше нет).
 #
 # Подключение: пакет api/feed/ (п. 1–6), в api/urls.py — path('feed/', include('api.feed.urls')),
 # в INSTALLED_APPS не добавлять. Места «ПРОВЕРЬТЕ» — допущения, которые нужно сверить с кодом.
@@ -30,8 +50,17 @@
 # ── 2. api/feed/sections.py ─────────────────────────────────────────────────
 """
 Разделы ленты — ЕДИНСТВЕННОЕ место, где описано, какие посты попадают в каждый раздел.
-Сейчас перенесена главная Альтерлита (как postinger в archive(type="index")); остальные разделы
-(главная AltCG, рубрики, литпоток, «Мимо главной», избранное, автор, теги…) добавляются сюда же.
+
+Имя раздела (параметр section):
+    index              — главная Альтерлита (как postinger в archive(type="index"));
+    category:<slug>    — рубрика /archive/category/<slug>/;
+    category:litpotok  — Литпоток (/archive/category/litpotok/): стихи и проза; то же — litpotok;
+    category:konkursy  — все подрубрики «Конкурсов» (parent = konkursy) и сама рубрика;
+    reviews:<post_id>  — рецензии на публикацию (/archive/reviews/<post_id>/);
+    profile:<username> — публикации пользователя (/profile/<username>/), статусы — по смотрящему;
+    profile:<username>:reviews — его рецензии (/profile/<username>/?posts=reviews).
+Везде новые сверху, по дате.
+Остальные (главная AltCG, «Мимо главной», избранное, автор, теги…) добавляются сюда же.
 """
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Exists, OuterRef, Q
@@ -45,12 +74,39 @@ PAGE_SIZE = 21  # settings.POSTS_LIMIT
 INDEX_ALTERLIT_CATEGORIES = [3, 4, 6, 7, 44, 54, 59]
 BLOG_CATEGORY = 10
 
+# Литпоток — стихи и проза
+LITPOTOK_CATEGORIES = [6, 7]
+# Рубрика, у которой лента — посты всех её подрубрик (и её самой)
+PARENT_SECTIONS = {'konkursy'}
+
+SITES = {'alterlit': ['AL', 'ALL'], 'altcg': ['ALT', 'ALL']}
+# Типы публикаций в лентах: везде — обычные и Ярмарка тщеславия; рецензии — только в своих
+# разделах (рецензии на публикацию и рецензии профиля). «Опубликовано в профиле» видно только
+# в профиле автора.
+FEED_POST_TYPES = ['post', 'story']
+REVIEW_POST_TYPES = ['review']
+ARCHIVE_STATUSES = ['published']
+
+
+# Профиль: что видно в ленте автора. «Отказано в публикации» (rejected) — никому.
+PROFILE_STATUSES_OWN = ['published', 'profile', 'draft', 'moderate', 'hidden']   # свой профиль
+PROFILE_STATUSES_STAFF = ['published', 'profile', 'moderate', 'hidden']          # is_staff в чужом
+PROFILE_STATUSES_OTHERS = ['published', 'profile']                               # остальные и гости
+
+
+class SectionNotFound(Exception):
+    """Раздел есть, но такой рубрики нет (или она не этого сайта) — 404 «не найдено»,
+    в отличие от «раздел ещё не перенесён»."""
+
 
 class Section:
     """Описание раздела: какие посты, с каких сайтов, какие блоки над лентой."""
 
-    def __init__(self, name, sites, post_types, statuses, where, blocks_param=None):
+    def __init__(self, name, sites, post_types, statuses, where, blocks_param=None, title=None,
+                 future=False):
         self.name = name
+        self.future = future              # показывать отложенные (дата в будущем) — свой профиль, staff
+        self.title = title                # заголовок раздела (рубрика) — для страницы
         self.sites = sites                # Post.site
         self.post_types = post_types      # Post.post_type
         self.statuses = statuses          # Post.status
@@ -58,10 +114,11 @@ class Section:
         self.blocks_param = blocks_param  # ключ в SiteParams "index_fixed_blocks"
 
     def queryset(self):
-        return (Post.objects
-                .filter(site__in=self.sites, post_type__in=self.post_types, status__in=self.statuses,
-                        author__is_active=True, date__lt=tz.now())
-                .filter(self.where()))
+        qs = (Post.objects
+              .filter(site__in=self.sites, post_type__in=self.post_types, status__in=self.statuses,
+                      author__is_active=True)
+              .filter(self.where()))
+        return qs if self.future else qs.filter(date__lt=tz.now())
 
 
 def _in_categories(ids):
@@ -76,14 +133,82 @@ def _index_alterlit():
 
 SECTIONS = {
     ('index', 'alterlit'): Section(
-        'index', sites=['AL', 'ALL'], post_types=['post', 'story', 'mem'], statuses=['published'],
+        'index', sites=['AL', 'ALL'], post_types=FEED_POST_TYPES, statuses=['published'],
         where=_index_alterlit, blocks_param='alterlit',
     ),
 }
 
 
-def get_section(name, mode):
-    return SECTIONS.get((name, mode))
+def _category_section(name, slug, mode):
+    """Рубрика по slug. Картиночные рубрики (родитель «images») — это /archive/images/, не посты."""
+    from blog.models import Category
+    sites = SITES.get(mode, SITES['alterlit'])
+    cat = (Category.objects.select_related('parent')
+           .filter(slug=slug, site__in=sites).first())
+    if cat is None or (cat.parent_id and cat.parent.slug == 'images') or slug == 'images':
+        raise SectionNotFound('Рубрика не найдена')
+    ids = [cat.id]
+    if slug in PARENT_SECTIONS:
+        ids += list(Category.objects.filter(parent=cat).values_list('id', flat=True))
+    return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
+                   where=lambda: Q(_in_categories(ids)), title=cat.title)
+
+
+def _reviews_section(name, post_id, sites):
+    """Рецензии на публикацию: опубликованные посты-рецензии с review_of = post_id."""
+    target = Post.objects.filter(pk=post_id).values('id', 'title').first()
+    if target is None:
+        raise SectionNotFound('Публикация не найдена')
+    return Section(name, sites=sites, post_types=REVIEW_POST_TYPES, statuses=ARCHIVE_STATUSES,
+                   where=lambda: Q(review_of_id=post_id), title=target['title'])
+
+
+def _profile_section(name, username, reviews, sites, user):
+    """Лента профиля. Свой — все статусы, кроме «отказано», и отложенные; staff в чужом — ещё
+    «на модерации» и «скрыта»; остальные — «опубликовано» и «опубликовано в профиле».
+    Рецензии профиля (?posts=reviews) — «опубликовано» и «опубликовано в профиле» для всех."""
+    from django.contrib.auth.models import User
+    author = User.objects.filter(username=username, is_active=True).values('id', 'username').first()
+    if author is None:
+        raise SectionNotFound('Пользователь не найден')
+    own = bool(user and user.is_authenticated and user.id == author['id'])
+    staff = bool(user and user.is_authenticated and user.is_staff)
+    author_id = author['id']
+    if reviews:
+        return Section(name, sites=sites, post_types=REVIEW_POST_TYPES, statuses=PROFILE_STATUSES_OTHERS,
+                       where=lambda: Q(author_id=author_id), title=author['username'])
+    statuses = PROFILE_STATUSES_OWN if own else PROFILE_STATUSES_STAFF if staff else PROFILE_STATUSES_OTHERS
+    return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=statuses,
+                   where=lambda: Q(author_id=author_id), title=author['username'], future=own or staff)
+
+
+def get_section(name, mode, user=None):
+    """Раздел по имени. -> Section | None (не перенесён). Рубрики, поста, автора нет — SectionNotFound.
+    user — кто смотрит: от него зависят статусы в ленте профиля."""
+    if (name, mode) in SECTIONS:
+        return SECTIONS[(name, mode)]
+    sites = SITES.get(mode)
+    if sites is None:
+        return None
+    if name.startswith('reviews:'):
+        post_id = name.split(':', 1)[1]
+        if not post_id.isdigit():
+            raise SectionNotFound('Публикация не найдена')
+        return _reviews_section(name, int(post_id), sites)
+    if name.startswith('profile:'):
+        parts = name.split(':')
+        if len(parts) not in (2, 3) or not parts[1] or (len(parts) == 3 and parts[2] != 'reviews'):
+            return None
+        return _profile_section(name, parts[1], len(parts) == 3, sites, user)
+    if name in ('litpotok', 'category:litpotok'):
+        return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
+                       where=lambda: Q(_in_categories(LITPOTOK_CATEGORIES)), title='Литпоток')
+    if name.startswith('category:'):
+        slug = name.split(':', 1)[1].strip().lower()
+        if not slug:
+            return None
+        return _category_section(name, slug, mode)
+    return None
 
 
 def page(section, before=None, limit=PAGE_SIZE):
@@ -348,15 +473,16 @@ def cards(posts, mode, sites, user, pinned=False):
 
 
 def viewer(user):
-    """Права смотрящего — для меню карточки (как accept_change/accept_delete/accept_add в шаблоне)."""
+    """Права смотрящего — для меню карточки. is_staff — блок «действия администратора» на чужих
+    постах; can_change / can_delete — права Django, которые проверяют ручки правки и удаления."""
     if not user or not user.is_authenticated:
-        return {'id': None, 'can_change': False, 'can_delete': False, 'can_add': False, 'can_hide': False}
+        return {'id': None, 'is_staff': False, 'can_change': False, 'can_delete': False, 'can_add': False}
     return {
         'id': user.id,
+        'is_staff': bool(user.is_staff),
         'can_change': user.has_perm('blog.change_post'),
         'can_delete': user.has_perm('blog.delete_post'),
         'can_add': user.has_perm('blog.add_post'),
-        'can_hide': user.id == 1,  # как в шаблоне: кнопка «скрыть» только у id 1
     }
 
 
@@ -370,8 +496,10 @@ def viewer(user):
 """
 import html
 import logging
+import random
 import re
 
+from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone as tz
 from django.utils.html import strip_tags
@@ -424,9 +552,33 @@ def _iod(mode):
     } for i in items]}
 
 
+EARS_LIMIT = 6
+EARS_IDS_TTL = 15 * 60  # список постов с цитатами пересобирается раз в 15 минут
+
+
+def _ears_queryset(sites):
+    # ear__gt='' отсекает и пустую строку, и NULL (exclude(ear='') пропустил бы NULL)
+    return Post.objects.filter(site__in=sites, status='published', ear__gt='')
+
+
 def _ears(sites):
-    ears = Post.objects.filter(site__in=sites, status='published').exclude(ear='').only('ear', 'status').order_by('?')[:6]
-    items = [{'url': p.get_url(), 'text': Truncator(html.unescape(strip_tags(p.ear))).words(25)} for p in ears]
+    """Случайные цитаты. Без ORDER BY RAND() (перебор всех опубликованных на каждый заход главной):
+    id постов с цитатой — из кэша на 15 минут, 6 случайных выбираются в Python и забираются по pk.
+    Цитату, которую администратор добавил только что, блок покажет после обновления кэша."""
+    key = 'feed:ears_ids:' + ','.join(sorted(sites))
+    ids = cache.get(key)
+    if ids is None:
+        ids = list(_ears_queryset(sites).values_list('id', flat=True))
+        cache.set(key, ids, EARS_IDS_TTL)
+    if len(ids) < 2:
+        return None
+    picked = random.sample(ids, min(EARS_LIMIT, len(ids)))
+    # повторная проверка: за 15 минут цитату могли убрать, а пост — снять с публикации
+    posts = {p.id: p for p in _ears_queryset(sites).filter(id__in=picked).only('ear', 'status')}
+    items = [
+        {'url': p.get_url(), 'text': Truncator(html.unescape(strip_tags(p.ear))).words(25)}
+        for p in (posts.get(i) for i in picked) if p
+    ]
     return {'type': 'ears', 'items': items} if len(items) > 1 else None
 
 
@@ -527,24 +679,34 @@ from rest_framework.views import APIView
 
 from api.feed.blocks import index_blocks
 from api.feed.cards import cards, viewer
-from api.feed.sections import get_section, page
+from api.feed.sections import SectionNotFound, get_section, page
 
 
 class FeedView(APIView):
     """
     GET /api/v1/feed/?section=index                — первая страница + блоки над лентой + права смотрящего
     GET /api/v1/feed/?section=index&before=<id>    — следующая страница (id последнего показанного поста)
-        → {"posts": [...карточки], "more": bool, "blocks": [...] (только на первой), "viewer": {...}}
-    Сайт — по request.mode. Раздел, который ещё не перенесён, — 404 (старая лента работает как раньше).
+    GET /api/v1/feed/?section=litpotok             — Литпоток
+    GET /api/v1/feed/?section=category:<slug>      — рубрика (category:konkursy — все конкурсы)
+    GET /api/v1/feed/?section=reviews:<post_id>    — рецензии на публикацию
+    GET /api/v1/feed/?section=profile:<username>   — публикации пользователя (статусы — по смотрящему)
+    GET /api/v1/feed/?section=profile:<username>:reviews — его рецензии
+        → {"posts": [...карточки], "more": bool, "viewer": {...},
+           на первой странице: "blocks": [...] (главная), "section": {"name", "title"}}
+    Сайт — по request.mode. 404 {"code": "not_migrated"} — раздел ещё не перенесён (старая лента
+    работает как раньше); 404 {"code": "not_found"} — такой рубрики нет.
     """
     authentication_classes = [SessionAuthentication]
     permission_classes = [AllowAny]
 
     def get(self, request):
         mode = getattr(request, 'mode', 'alterlit')
-        section = get_section(request.query_params.get('section', 'index'), mode)
+        try:
+            section = get_section(request.query_params.get('section', 'index'), mode, request.user)
+        except SectionNotFound as ex:
+            return Response({'detail': str(ex) or 'Не найдено', 'code': 'not_found'}, status=404)
         if section is None:
-            return Response({'detail': 'Раздел пока не перенесён'}, status=404)
+            return Response({'detail': 'Раздел пока не перенесён', 'code': 'not_migrated'}, status=404)
         before = request.query_params.get('before')
         before = int(before) if before and before.isdigit() else None
 
@@ -554,8 +716,10 @@ class FeedView(APIView):
             'more': more,
             'viewer': viewer(request.user),
         }
-        if not before and section.blocks_param:
-            data['blocks'] = index_blocks(section.blocks_param, section.sites, request.user)
+        if not before:
+            data['section'] = {'name': section.name, 'title': section.title}
+            if section.blocks_param:
+                data['blocks'] = index_blocks(section.blocks_param, section.sites, request.user)
         return Response(data)
 
 

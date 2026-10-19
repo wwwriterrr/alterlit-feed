@@ -7,7 +7,7 @@ export interface FeedContextValue {
   viewer: Viewer;
 }
 
-export const ANON: Viewer = { id: null, can_change: false, can_delete: false, can_add: false, can_hide: false };
+export const ANON: Viewer = { id: null, is_staff: false, can_change: false, can_delete: false, can_add: false };
 
 export const FeedContext = createContext<FeedContextValue>({ section: 'index', viewer: ANON });
 

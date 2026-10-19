@@ -74,7 +74,8 @@ export interface Viewer {
   can_change: boolean;
   can_delete: boolean;
   can_add: boolean;
-  can_hide: boolean;
+  /** блок «действия администратора» на чужих постах */
+  is_staff: boolean;
 }
 
 export interface AnnouncementsBlock {
@@ -120,6 +121,8 @@ export interface FeedPage {
   posts: Card[];
   more: boolean;
   viewer: Viewer;
-  /** только на первой странице */
+  /** только на первой странице: блоки главной */
   blocks?: Block[];
+  /** только на первой странице: имя раздела и заголовок (рубрика, «Литпоток»; у главной — null) */
+  section?: { name: string; title: string | null };
 }
