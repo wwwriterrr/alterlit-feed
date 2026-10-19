@@ -22,6 +22,9 @@ export interface Category {
 export interface CoverImage {
   id: number;
   orientation: 'horizontal' | 'vertical' | string;
+  /** размеры картинки (с учётом поворота EXIF); есть — блок сразу нужных пропорций, src — превью без полей */
+  width?: number;
+  height?: number;
   src: string;
   full?: string;
   preload: string;

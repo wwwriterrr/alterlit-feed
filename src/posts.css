@@ -478,6 +478,38 @@ article.post .alp-peek-avatars img:first-child {
   stroke-linejoin: round;
 }
 
+/* Картинка карточки с известными размерами (CardImage): высота — из пропорций, без полей;
+   вертикальные — не выше 3:4.
+   Селекторы с article.post — перебить фиксированные высоты и object-fit сайта. */
+article.post .post-image.alp-img {
+  height: auto;
+  overflow: hidden;
+  background: var(--color-6, #edece8);
+}
+article.post .post-image.alp-img img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+article.post .post-image.alp-img img.alp-img-blur {
+  object-fit: cover;
+  filter: blur(14px) saturate(1.05);
+  transform: scale(1.15);
+}
+article.post .post-image.alp-img img.alp-img-main {
+  /* блок тех же пропорций, что картинка, — она его заполняет; у вертикальных выше 3:4
+     срезается низ и верх (чуть выше центра — лица и заголовки обычно там) */
+  object-fit: cover;
+  object-position: 50% 35%;
+  background: none;
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
+}
+article.post .post-image.alp-img img.alp-img-main.is-loaded {
+  opacity: 1;
+}
+
 /* круг Ярмарки тщеславия «дорисовывается» при появлении (раньше — gsap в _story_circle_animate) */
 .alp-story-circle {
   stroke-dashoffset: -524;
@@ -519,6 +551,9 @@ article.post .alp-peek-avatars img:first-child {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  article.post .post-image.alp-img img.alp-img-main {
+    transition: none;
+  }
   .alp-digit-out {
     display: none;
   }

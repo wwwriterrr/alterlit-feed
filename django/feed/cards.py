@@ -70,6 +70,23 @@ def _polls(posts):
 
 
 def _image(img):
+    """Картинка карточки. Есть размеры (images_patch.py, fill_image_sizes) — новое превью без полей
+    (image_card), пропорции и размытая подложка, файл с диска не читается. Нет — как раньше:
+    превью 290×210 / 290×340 и ориентация по файлу."""
+    w, h = getattr(img, 'width', None), getattr(img, 'height', None)
+    if w and h:
+        gif = img.image.name.lower().endswith('.gif')
+        card = img.image if gif or not hasattr(img, 'image_card') else img.image_card
+        return {
+            'id': img.id,
+            'orientation': 'vertical' if w < h else 'horizontal',
+            'width': w,
+            'height': h,
+            'src': card.url,
+            'full': img.image.url,
+            # размытое мини-превью тех же пропорций (PreloadImg) — подложка, пока грузится src
+            'preload': img.full_preload_webp_url,
+        }
     return {
         'id': img.id,
         'orientation': img.orientation(),

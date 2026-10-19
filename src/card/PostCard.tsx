@@ -4,6 +4,7 @@ import { formatDate, formatFullDate, formatStamp, isFuture } from '../date';
 import { ArrowNext, Comment, CreativeMarket, Ellipsis, Like, Review } from '../icons';
 import { PostAvatar, UserName } from './Author';
 import RollingNumber from './RollingNumber';
+import CardImage from './CardImage';
 import { useDialogs } from '../dialogs/DialogsProvider';
 import { useFeedContext } from '../FeedContext';
 import { isAuthError, useLikeMutation, useToggleHiddenMutation } from '../api';
@@ -357,18 +358,27 @@ export default function PostCard({ card }: { card: Card }) {
         </div>
       </div>
 
-      {image && (
-        <div className={`post-image${t('toggle-d')} ${image.orientation}`} data-href={card.url} onClick={() => go(card.url)}>
-          <img
-            id={`image-${image.id}`}
-            data-fullsrc={image.full ?? image.src}
-            data-src={image.src}
-            src={image.src}
-            loading="lazy"
-            alt=""
+      {image &&
+        (image.width && image.height ? (
+          <CardImage
+            image={image as typeof image & { width: number; height: number }}
+            extraClass={t('toggle-d')}
+            href={card.url}
+            onOpen={() => go(card.url)}
           />
-        </div>
-      )}
+        ) : (
+          // размеров ещё нет (не заполнены на сервере) — как раньше: блок фиксированной высоты
+          <div className={`post-image${t('toggle-d')} ${image.orientation}`} data-href={card.url} onClick={() => go(card.url)}>
+            <img
+              id={`image-${image.id}`}
+              data-fullsrc={image.full ?? image.src}
+              data-src={image.src}
+              src={image.src}
+              loading="lazy"
+              alt=""
+            />
+          </div>
+        ))}
 
       <h3 className={`post-title${t('toggle-d')}`}>
         <a href={card.url}>{card.title}</a>
