@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IodBlock } from '../types';
 import s from './Iod.module.css';
+import { IMAGE_CLOSED_EVENT, openImage } from '../viewer';
 
 const GALLERY = '/archive/images/image_of_day/';
 /** Через сколько бездействия листать вперёд. */
@@ -14,7 +15,8 @@ const DRAG_THRESHOLD = 6;
  * и миниатюры под картинкой (на самой картинке ничего не лежит). Через 10 секунд бездействия
  * листает вперёд; пауза, пока курсор над картинкой, блок вне экрана или вкладка скрыта.
  * Картинка вписана целиком (на них часто текст), поле вокруг — её же размытое превью.
- * Клик по картинке открывает общий просмотрщик сайта (img.smart-view).
+ * Клик по картинке открывает единое окно просмотра (viewer.js) с листанием всех четырёх;
+ * пока окно открыто, автолистание стоит.
  */
 export default function Iod({ block }: { block: IodBlock }) {
   const root = useRef<HTMLElement>(null);
@@ -26,10 +28,21 @@ export default function Iod({ block }: { block: IodBlock }) {
   const [onScreen, setOnScreen] = useState(false);
   const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible');
   const [dragging, setDragging] = useState(false);
+  // открыто окно просмотра — картинка за ним не листается
+  const [viewing, setViewing] = useState(false);
+  useEffect(() => {
+    const onClosed = () => {
+      setViewing(false);
+      setActivity((a) => a + 1); // отсчёт до автолистания — заново
+    };
+    window.addEventListener(IMAGE_CLOSED_EVENT, onClosed);
+    return () => window.removeEventListener(IMAGE_CLOSED_EVENT, onClosed);
+  }, []);
   const drag = useRef<{ x: number; left: number; id: number; moved: boolean } | null>(null);
   const dragJustEnded = useRef(false);
   const items = block.items;
   const n = items.length;
+  const ids = items.map((i) => i.id);
   const touch = useCallback(() => setActivity((a) => a + 1), []);
 
   // активный слайд — по положению прокрутки (свайп, колесо, стрелки — всё через неё)
@@ -76,7 +89,7 @@ export default function Iod({ block }: { block: IodBlock }) {
     };
   }, []);
 
-  const paused = n < 2 || hover || dragging || !onScreen || !pageVisible;
+  const paused = n < 2 || hover || dragging || viewing || !onScreen || !pageVisible;
   useEffect(() => {
     if (paused) return;
     const t = window.setTimeout(() => goTo(index + 1), AUTOPLAY_MS);
@@ -181,11 +194,12 @@ export default function Iod({ block }: { block: IodBlock }) {
               <span className={s.backdrop} style={{ backgroundImage: `url(${img.preload})` }} aria-hidden="true" />
               <img
                 id={`image-${img.id}`}
-                className={`smart-view ${s.img}`}
-                data-fullsrc={img.full}
-                data-src={img.src}
-                data-href={img.href}
+                className={s.img}
                 src={img.src}
+                onClick={() => {
+                  setViewing(true);
+                  openImage(img.id, ids, img.href);
+                }}
                 alt={img.descr || `Картинка дня ${i + 1}`}
                 loading={i === 0 ? 'eager' : 'lazy'}
                 draggable={false}

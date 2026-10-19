@@ -129,3 +129,35 @@ export interface FeedPage {
   /** только на первой странице: имя раздела и заголовок (рубрика, «Литпоток»; у главной — null) */
   section?: { name: string; title: string | null };
 }
+
+/** Голосование в посте (шорткод vote-N в тексте): GET/POST /api/v1/voting/<id>/ */
+export interface VoteChoice {
+  id: number;
+  /** свой текст или сущность сайта */
+  kind: 'text' | 'post' | 'comment' | 'user';
+  text: string;
+  url?: string;
+  image?: string | null;
+  avatar?: string | null;
+  mine: boolean;
+  /** null — результаты ещё скрыты (не голосовал, голосование идёт) */
+  votes: number | null;
+}
+
+export interface Vote {
+  id: number;
+  title: string;
+  description: string;
+  /** можно выбрать несколько вариантов */
+  multiple: boolean;
+  /** можно снять свой голос */
+  can_revote: boolean;
+  ended: boolean;
+  date_execute: string | null;
+  voted: boolean;
+  show_results: boolean;
+  total: number;
+  /** страница голосования /vote/<id>/ */
+  url: string;
+  choices: VoteChoice[];
+}

@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery, type FetchBaseQueryError } from '@reduxjs/toolkit/query/react';
-import type { Card, FeedPage } from './types';
+import type { Card, FeedPage, Vote } from './types';
 
 let csrfFallback = '';
 /** Токен CSRF, если куки csrftoken нет: <div id="alterlit-posts" data-csrf="{{ csrf_token }}"> */
@@ -156,6 +156,24 @@ export const api = createApi({
       },
     }),
 
+    /** Голосование в посте. */
+    vote: build.query<Vote, number>({
+      query: (id) => `api/v1/voting/${id}/`,
+      keepUnusedDataFor: 0,
+    }),
+    /** Голос: тот же ответ, что у vote, — кладём его в кэш вместо прежнего. */
+    castVote: build.mutation<Vote, { id: number; choiceId: number }>({
+      query: ({ id, choiceId }) => ({ url: `api/v1/voting/${id}/`, method: 'POST', body: { choice_id: choiceId } }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(api.util.upsertQueryData('vote', id, data));
+        } catch {
+          /* ошибку показывает окно */
+        }
+      },
+    }),
+
     /** Жалоба на пост — задачей в поддержку, как жалоба на комментарий (аноним указывает email). */
     complaint: build.mutation<unknown, { id: number; text: string; email?: string }>({
       query: ({ id, text, email }) => {
@@ -189,5 +207,5 @@ function removeCard(section: string, id: number) {
   });
 }
 
-export const { useFeedInfiniteQuery, useLikeMutation, useDeletePostMutation, useToggleHiddenMutation, useComplaintMutation } =
+export const { useFeedInfiniteQuery, useVoteQuery, useCastVoteMutation, useLikeMutation, useDeletePostMutation, useToggleHiddenMutation, useComplaintMutation } =
   api;

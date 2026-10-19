@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Card, Viewer } from '../types';
 import { formatDate, formatFullDate, formatStamp, isFuture } from '../date';
-import { ArrowNext, Comment, CreativeMarket, Ellipsis, Like, Review } from '../icons';
+import {
+  Adult18Icon,
+  ArrowNext,
+  AudioIcon,
+  Comment,
+  CreativeMarket,
+  Ellipsis,
+  GoldIcon,
+  Like,
+  PinIcon,
+  PollIcon,
+  RecommendedIcon,
+  Review,
+} from '../icons';
 import { PostAvatar, UserName } from './Author';
 import RollingNumber from './RollingNumber';
 import CardImage from './CardImage';
@@ -56,27 +69,42 @@ function Head({ card, onToggle }: { card: Card; onToggle?: () => void }) {
       )}
       {icons && (
         <div className="post-head-icons">
-          {/* TODO иконки: svg_is_gold, svg_pin, svg_recommended, svg_audio, svg_poll, svg_18+ — ждём разметку */}
-          {flags.is_18 && <i className="post-is-18-icon" title="Для взрослых" />}
-          {flags.is_gold && (
-            <i className="post-gold-icon" title="Избранное">
-              <a href="/archive/favorites/all/" aria-label="Избранное" />
+          {flags.is_18 && (
+            <i className="post-is-18-icon" title="Для взрослых">
+              <Adult18Icon />
             </i>
           )}
-          {flags.is_pinned && <i className="post-pin-icon" />}
+          {flags.is_gold && (
+            <i className="post-gold-icon" title="Избранное">
+              <a href="/archive/favorites/all/">
+                <GoldIcon />
+              </a>
+            </i>
+          )}
+          {flags.is_pinned && (
+            <i className="post-pin-icon" title="Публикация закреплена">
+              <PinIcon />
+            </i>
+          )}
           {flags.is_recommended && (
             <i className="post-rec-icon" title="Рекомендовано редакцией">
-              <a href="/archive/publications/recommended/" aria-label="Рекомендовано редакцией" />
+              <a href="/archive/publications/recommended/">
+                <RecommendedIcon />
+              </a>
             </i>
           )}
           {flags.is_voiced && (
             <i className="post-voiced-icon" title="Озвучено">
-              <a href="/archive/category/sound/" aria-label="Озвучено" />
+              <a href="/archive/category/sound/">
+                <AudioIcon />
+              </a>
             </i>
           )}
           {poll && (
             <i className="post-poll-icon" title="Публикация содержит опрос">
-              <a href="/archive/category/polls/" aria-label="Опрос" />
+              <a href="/archive/category/polls/">
+                <PollIcon />
+              </a>
             </i>
           )}
           {flags.from_cm && (
@@ -296,6 +324,7 @@ function MoreMenu({ card, viewer, onDone }: { card: Card; viewer: Viewer; onDone
 /** Карточка поста — разметка parts/post_list_v2.html, чтобы работали стили сайта. */
 export default function PostCard({ card }: { card: Card }) {
   const { viewer } = useFeedContext();
+  const dialogs = useDialogs();
   const [toggled, setToggled] = useState(false);
   const [more, setMore] = useState(false);
   const ref = useRef<HTMLElement>(null);
@@ -380,6 +409,16 @@ export default function PostCard({ card }: { card: Card }) {
           </div>
         ))}
 
+      {/* плашка об упоминании наркотиков (drugs_notice: text / text_icon) — как в старом шаблоне */}
+      {card.flags.drugs_notice && (
+        <div className="post-drug-notice">
+          <span>
+            Незаконное потребление наркотических средств, психотропных веществ, их аналогов причиняет вред здоровью, их
+            незаконный оборот запрещен и влечет установленную законодательством ответственность.
+          </span>
+        </div>
+      )}
+
       <h3 className={`post-title${t('toggle-d')}`}>
         <a href={card.url}>{card.title}</a>
       </h3>
@@ -392,8 +431,13 @@ export default function PostCard({ card }: { card: Card }) {
           <div className="pp-title">{card.poll.title}</div>
           <div className="pp-descr">{card.poll.description}</div>
           <div className="pp-btn-wrap">
-            {/* голосование — на странице опроса (окно с голосованием перенесём вместе с блоком «Голосование») */}
-            <button type="button" className="pp-btn" onClick={() => go(card.poll!.url)} />
+            {/* «Голосовать» — надпись рисуют стили сайта (.pp-btn::before); окно голосования — в острове */}
+            <button
+              type="button"
+              className="pp-btn"
+              aria-label="Голосовать"
+              onClick={() => dialogs.open({ kind: 'vote', voteId: card.poll!.id })}
+            />
           </div>
         </div>
       )}

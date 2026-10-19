@@ -4,12 +4,14 @@ import ShareDialog from './ShareDialog';
 import ComplaintDialog from './ComplaintDialog';
 import DeleteDialog from './DeleteDialog';
 import Dialog from './Dialog';
+import VoteDialog from './VoteDialog';
 
 /** Окна ленты — одно на остров; вместо #altermodal из base.html. */
 export type DialogRequest =
   | { kind: 'share'; card: Card }
   | { kind: 'complaint'; card: Card }
   | { kind: 'delete'; card: Card }
+  | { kind: 'vote'; voteId: number }
   | { kind: 'auth'; text: string };
 
 const Ctx = createContext<{ open: (r: DialogRequest) => void }>({ open: () => {} });
@@ -26,6 +28,7 @@ export function DialogsProvider({ children }: { children: ReactNode }) {
       {req?.kind === 'share' && <ShareDialog card={req.card} onClose={close} />}
       {req?.kind === 'complaint' && <ComplaintDialog card={req.card} onClose={close} />}
       {req?.kind === 'delete' && <DeleteDialog card={req.card} onClose={close} />}
+      {req?.kind === 'vote' && <VoteDialog voteId={req.voteId} onClose={close} />}
       {req?.kind === 'auth' && (
         <Dialog title="Ой!" onClose={close}>
           <p>{req.text}</p>

@@ -16,13 +16,10 @@ if (rootEl) {
   setCsrfFallback(rootEl.dataset.csrf ?? '');
 
   // Обработчики старой ленты в base.html висят делегированием на #alterlit и body
-  // (лайк, «…», удалить, скрыть, свернуть) — клики острова до них не доходят, иначе
-  // действие выполнится дважды. Пропускаем только картинки smart-view: их открывает
-  // общий просмотрщик сайта.
-  rootEl.addEventListener('click', (e) => {
-    const target = e.target as Element | null;
-    if (!target?.closest?.('img.smart-view')) e.stopPropagation();
-  });
+  // (лайк, «…», удалить, скрыть, свернуть, просмотр smart-view) — клики острова до них
+  // не доходят, иначе действие выполнится дважды. Картинки остров открывает сам — в едином
+  // окне просмотра (viewer.ts).
+  rootEl.addEventListener('click', (e) => e.stopPropagation());
   // ссылки на маршруты, которые остров открывает сам, — без перезагрузки
   interceptLinks(rootEl);
 

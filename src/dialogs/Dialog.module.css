@@ -210,6 +210,7 @@
 .link {
   display: flex;
   align-items: center;
+  gap: 12px;
   min-height: 40px;
   padding: 8px 12px;
   border: 1px solid #e7dfcd;
@@ -233,4 +234,9 @@
   color: #898989;
   font-style: italic;
   font-size: 0.9em;
+}
+.share svg {
+  flex: none;
+  width: 26px;
+  height: 26px;
 }

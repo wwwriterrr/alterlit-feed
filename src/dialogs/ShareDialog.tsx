@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Card } from '../types';
 import Dialog from './Dialog';
 import s from './Dialog.module.css';
+import { TelegramIcon, VkIcon, WhatsAppIcon, ZenIcon } from './ShareIcons';
 
 /** «Поделиться» — те же ссылки, что в старом окне (_post_share_action). */
 export default function ShareDialog({ card, onClose }: { card: Card; onClose: () => void }) {
@@ -29,22 +30,26 @@ export default function ShareDialog({ card, onClose }: { card: Card; onClose: ()
       <ul className={s.share}>
         <li>
           <a href={`https://vk.com/share.php?url=${u}&title=${t}`} target="_blank" rel="noopener noreferrer">
-            ВКонтакте
+            <VkIcon />
+            <span>ВКонтакте</span>
           </a>
         </li>
         <li>
           <a href={`https://passport.yandex.ru/auth?origin=zen_pubs&retpath=${u}&text=${t}`} target="_blank" rel="noopener noreferrer">
-            Дзен
+            <ZenIcon />
+            <span>Дзен</span>
           </a>
         </li>
         <li>
           <a href={`https://api.whatsapp.com/send?text=${u}&utm_source=share2`} target="_blank" rel="noopener noreferrer">
-            WhatsApp
+            <WhatsAppIcon />
+            <span>WhatsApp</span>
           </a>
         </li>
         <li>
           <a href={`https://t.me/share/url?url=${u}`} target="_blank" rel="noopener noreferrer">
-            Telegram
+            <TelegramIcon />
+            <span>Telegram</span>
           </a>
         </li>
       </ul>
