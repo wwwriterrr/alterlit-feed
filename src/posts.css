@@ -327,6 +327,157 @@ article.post .post-counts li span.alp-digit > span {
   }
 }
 
+/* Свёрнутые блоки на телефоне (сайт сворачивает их на ≤500px): вместо серой шапки —
+   своё свёрнутое состояние по смыслу блока. На компьютере блоки развёрнуты, .alp-peek скрыт. */
+.alp-peek {
+  display: none;
+}
+@media screen and (max-width: 500px) {
+  article.post.toggle:not(.toggled) > .post-head {
+    display: none;
+  }
+  article.post.toggle:not(.toggled) > .alp-peek {
+    display: flex;
+  }
+}
+article.post .alp-peek {
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 10px 12px 12px;
+  border: 0;
+  border-left: 4px solid var(--alp-peek-accent);
+  background: var(--color-6, #edece8);
+  color: #1e2618;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+article.post .alp-peek:focus-visible {
+  outline: 2px solid var(--color-2, #e9aa44);
+  outline-offset: -2px;
+}
+.alp-peek--news {
+  --alp-peek-accent: var(--color-2, #e9aa44);
+}
+.alp-peek--crowd {
+  --alp-peek-accent: var(--color-9, #245326);
+}
+.alp-peek-badge {
+  flex: none;
+  display: flex;
+  width: 30px;
+  height: 30px;
+}
+.alp-peek-badge svg {
+  width: 100%;
+  height: 100%;
+}
+.alp-peek-badge svg path {
+  fill: var(--color-2, #e9aa44);
+}
+.alp-peek-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.alp-peek-label {
+  color: #6e6a5e;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.alp-peek-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-2, #e9aa44);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-align: center;
+}
+.alp-peek-line {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  animation: alp-peek-in 0.45s ease-out;
+}
+.alp-peek-date {
+  color: #8a8578;
+  font-size: 12px;
+  font-weight: normal;
+}
+@keyframes alp-peek-in {
+  from {
+    transform: translateY(60%);
+    opacity: 0;
+  }
+}
+.alp-peek-title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.alp-peek-crowd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.alp-peek-avatars {
+  display: flex;
+  flex: none;
+}
+article.post .alp-peek-avatars img {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  margin: 0 0 0 -8px;
+  border: 2px solid var(--color-6, #edece8);
+  border-radius: 50%;
+  object-fit: cover;
+}
+article.post .alp-peek-avatars img:first-child {
+  margin-left: 0;
+}
+.alp-peek-meta {
+  overflow: hidden;
+  color: #6e6a5e;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.alp-peek-chevron {
+  flex: none;
+  display: flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+}
+.alp-peek-chevron svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #6e6a5e;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* круг Ярмарки тщеславия «дорисовывается» при появлении (раньше — gsap в _story_circle_animate) */
 .alp-story-circle {
   stroke-dashoffset: -524;
@@ -372,6 +523,7 @@ article.post .post-counts li span.alp-digit > span {
     display: none;
   }
   .alp-story-circle,
+  .alp-peek-line,
   .alp-digit-in,
   .alp-skel .alp-skel-bar,
   article.post .post-more-wrap.alp-more,

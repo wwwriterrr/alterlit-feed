@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AnnouncementsBlock, Block, EarsBlock, Widget1Block } from '../types';
 import { formatDate, formatFullDate } from '../date';
 import { ArrowNext, Exclam } from '../icons';
@@ -7,10 +7,16 @@ import PostCard from '../card/PostCard';
 import Slider from './Slider';
 import Iod from './Iod';
 
-/** Сворачиваемый блок (article.post.toggle): стрелка в шапке, класс toggled. */
+/**
+ * Сворачиваемый блок (article.post.toggle): стрелка в шапке, класс toggled.
+ * Свёрнут блок только на телефоне (≤500px, стили сайта); там вместо серой шапки — своё
+ * свёрнутое состояние по смыслу блока (.alp-peek), тап по нему — развернуть.
+ */
 function useToggle() {
   const [toggled, setToggled] = useState(false);
   return {
+    toggled,
+    open: () => setToggled(true),
     cls: toggled ? ' toggled' : '',
     button: (
       <button className="post-toggle-btn" type="button" onClick={() => setToggled((v) => !v)} aria-label="Свернуть или развернуть">
@@ -20,10 +26,80 @@ function useToggle() {
   };
 }
 
+/** Объявления — новости: в свёрнутом виде видна свежая, заголовки сменяют друг друга. */
+function AnnouncementsPeek({ block, onOpen }: { block: AnnouncementsBlock; onOpen: () => void }) {
+  const items = block.items;
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (items.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t = window.setInterval(() => setI((v) => (v + 1) % items.length), 4500);
+    return () => clearInterval(t);
+  }, [items.length]);
+  const item = items[i];
+  return (
+    <button type="button" className="alp-peek alp-peek--news" onClick={onOpen} aria-label={`Объявления: ${items.length}. Развернуть`}>
+      <span className="alp-peek-badge" aria-hidden="true">
+        <Exclam />
+      </span>
+      <span className="alp-peek-body">
+        <span className="alp-peek-label">
+          Объявления <span className="alp-peek-count">{items.length}</span>
+        </span>
+        {/* новый key — заголовок въезжает заново */}
+        <span key={i} className="alp-peek-line">
+          <span className="alp-peek-date">{formatDate(item.date)}</span> {item.title}
+        </span>
+      </span>
+      <PeekChevron />
+    </button>
+  );
+}
+
+/** Конкурс — поток работ участников: аватары последних авторов и сколько работ. */
+function Widget1Peek({ block, onOpen }: { block: Widget1Block; onOpen: () => void }) {
+  const n = block.posts.length;
+  return (
+    <button type="button" className="alp-peek alp-peek--crowd" onClick={onOpen} aria-label={`${block.title}: ${n} новых работ. Развернуть`}>
+      <span className="alp-peek-body">
+        <span className="alp-peek-title">{block.title}</span>
+        <span className="alp-peek-crowd">
+          <span className="alp-peek-avatars" aria-hidden="true">
+            {block.posts.map((p, k) => (
+              <img key={k} src={p.author.avatar || NO_AVATAR} alt="" style={{ zIndex: n - k }} />
+            ))}
+          </span>
+          <span className="alp-peek-meta">
+            {n} {plural(n, 'новая работа', 'новые работы', 'новых работ')}
+            {block.more_count > 1 && <> · ещё {block.more_count}</>}
+          </span>
+        </span>
+      </span>
+      <PeekChevron />
+    </button>
+  );
+}
+
+const PeekChevron = () => (
+  <span className="alp-peek-chevron" aria-hidden="true">
+    <svg viewBox="0 0 24 24">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  </span>
+);
+
+const plural = (n: number, one: string, few: string, many: string) => {
+  const d = n % 10;
+  const h = n % 100;
+  if (d === 1 && h !== 11) return one;
+  if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return few;
+  return many;
+};
+
 function Announcements({ block }: { block: AnnouncementsBlock }) {
   const t = useToggle();
   return (
     <article className={`post toggle ann-widget${t.cls}`}>
+      <AnnouncementsPeek block={block} onOpen={t.open} />
       <div className="post-head">
         {t.button}
         <h2>
@@ -72,6 +148,7 @@ function Widget1({ block }: { block: Widget1Block }) {
   const t = useToggle();
   return (
     <article className={`post toggle widget-1${t.cls}`}>
+      <Widget1Peek block={block} onOpen={t.open} />
       <div className="post-head">
         {t.button}
         <h2>

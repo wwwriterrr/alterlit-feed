@@ -568,7 +568,8 @@ def _ears(sites):
     key = 'feed:ears_ids:' + ','.join(sorted(sites))
     ids = cache.get(key)
     if ids is None:
-        ids = list(_ears_queryset(sites).values_list('id', flat=True))
+        # order_by() — без сортировки по дате из Meta.ordering: нужен только список id
+        ids = list(_ears_queryset(sites).order_by().values_list('id', flat=True))
         cache.set(key, ids, EARS_IDS_TTL)
     if len(ids) < 2:
         return None
