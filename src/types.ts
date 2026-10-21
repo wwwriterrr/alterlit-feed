@@ -66,6 +66,8 @@ export interface Card {
     from_cm: boolean;
     drugs_notice: boolean;
     is_pinned: boolean;
+    /** стихи — класс poem у карточки */
+    is_poem?: boolean;
   };
   counts: { likes: number; comments: number; reviews: number; liked: boolean };
   /** закреплённый пост над лентой (блок pin) */

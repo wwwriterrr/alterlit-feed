@@ -356,6 +356,7 @@ export default function PostCard({ card }: { card: Card }) {
     toggle && toggled && 'toggled',
     card.status === 'moderate' && 'moderate',
     delayed && 'delay',
+    card.flags.is_poem && 'poem',
     more && 'more',
   ]
     .filter(Boolean)

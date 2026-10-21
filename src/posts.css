@@ -681,6 +681,75 @@ article.post .alp-quotes-dot[data-active] {
   text-align: center;
 }
 
+/* «Виджет 1» (конкурс) развёрнутый: работы строками — аватар, название, «автор · дата» */
+article.post.widget-1 > .post-head {
+  margin-bottom: 0;
+}
+.alp-w1-list {
+  margin: 0;
+  padding: 6px 0 4px;
+  list-style: none;
+}
+.alp-w1-list li {
+  display: block;
+}
+.alp-w1-list li + li {
+  border-top: 1px solid #dedbd2;
+}
+article.post .alp-w1-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 10px 14px;
+  color: #1e2618;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+article.post .alp-w1-item:hover {
+  background: rgba(255, 253, 248, 0.7);
+}
+article.post .alp-w1-item:focus-visible {
+  outline: 2px solid var(--color-2, #e9aa44);
+  outline-offset: -2px;
+}
+article.post .alp-w1-av {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin: 1px 0 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.alp-w1-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.alp-w1-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: bold;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.alp-w1-meta {
+  overflow: hidden;
+  color: #8a8578;
+  font-size: 0.8em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.alp-w1-author {
+  color: #5d5a50;
+}
+/* «Ещё N работ» — кнопка, как «В галерею» у картинки дня */
+article.post .alp-w1-more {
+  margin-top: 8px;
+}
+
 /* круг Ярмарки тщеславия «дорисовывается» при появлении (раньше — gsap в _story_circle_animate) */
 .alp-story-circle {
   stroke-dashoffset: -524;

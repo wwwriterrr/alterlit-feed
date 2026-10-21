@@ -6,6 +6,7 @@ import { useEffect, useSyncExternalStore } from 'react';
  *
  *   /                           → лента главной (section index)
  *   /archive/category/<slug>/   → рубрика (category:<slug>; litpotok, konkursy — тоже рубрики)
+ *   /archive/favorites/all/     → Избранное (favorites)
  *   /archive/reviews/<id>/      → рецензии на публикацию (reviews:<id>)
  *   /profile/<username>/        → публикации пользователя (profile:<username>; ?posts=reviews → …:reviews)
  *   /post/<id>/                 → одиночная публикация — маршрут заведён заранее, страница будет позже
@@ -15,6 +16,7 @@ export type Route = { kind: 'feed'; section: string } | { kind: 'post'; id: numb
 export function parseRoute(url: URL | Location): Route | null {
   const { pathname, search } = url;
   if (pathname === '/' || pathname === '') return { kind: 'feed', section: 'index' };
+  if (/^\/archive\/favorites\/all\/?$/.test(pathname)) return { kind: 'feed', section: 'favorites' };
   let m = /^\/archive\/category\/([^/]+)\/?$/.exec(pathname);
   if (m) return { kind: 'feed', section: `category:${decodeURIComponent(m[1])}` };
   m = /^\/archive\/reviews\/(\d+)\/?$/.exec(pathname);
@@ -68,6 +70,8 @@ export function navigate(href: string) {
     return;
   }
   rememberScroll();
+  // прокрутку при «Назад» между своими записями восстанавливаем сами (useScrollRestoration)
+  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
   window.history.pushState({ alpScroll: 0 }, '', url.pathname + url.search + url.hash);
   window.scrollTo(0, 0);
   notify();
@@ -91,10 +95,12 @@ export function interceptLinks(root: HTMLElement) {
   });
 }
 
-/** «Назад»/«Вперёд» по своим записям — прокрутка туда, где была (после отрисовки). */
+/**
+ * «Назад»/«Вперёд» по своим записям (переходы без перезагрузки) — прокрутка туда, где была.
+ * Возврат на страницу после обычного перехода (с перезагрузкой) — feedRestore.ts.
+ */
 export function useScrollRestoration(key: string) {
   useEffect(() => {
-    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
     const y = (window.history.state as { alpScroll?: number } | null)?.alpScroll;
     if (typeof y === 'number' && y > 0) requestAnimationFrame(() => window.scrollTo(0, y));
   }, [key]);

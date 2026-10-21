@@ -6,6 +6,7 @@
     category:<slug>    — рубрика /archive/category/<slug>/;
     category:litpotok  — Литпоток (/archive/category/litpotok/): стихи и проза; то же — litpotok;
     category:konkursy  — все подрубрики «Конкурсов» (parent = konkursy) и сама рубрика;
+    favorites          — Избранное (/archive/favorites/all/): опубликованные с is_gold;
     reviews:<post_id>  — рецензии на публикацию (/archive/reviews/<post_id>/);
     profile:<username> — публикации пользователя (/profile/<username>/), статусы — по смотрящему;
     profile:<username>:reviews — его рецензии (/profile/<username>/?posts=reviews).
@@ -150,6 +151,9 @@ def get_section(name, mode, user=None):
         if len(parts) not in (2, 3) or not parts[1] or (len(parts) == 3 and parts[2] != 'reviews'):
             return None
         return _profile_section(name, parts[1], len(parts) == 3, sites, user)
+    if name == 'favorites':
+        return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
+                       where=lambda: Q(is_gold=True), title='Избранное')
     if name in ('litpotok', 'category:litpotok'):
         return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
                        where=lambda: Q(_in_categories(LITPOTOK_CATEGORIES)), title='Литпоток')

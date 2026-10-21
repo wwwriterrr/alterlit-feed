@@ -109,25 +109,55 @@ def _mem_image(img):
 
 
 RE_SHORTCODE = re.compile(r'/\*(?:vote|audio|file|preorder)-\d+\*/')
-RE_ENTITY = re.compile(r'&[\w#]+;')
 
 
-def _plain(value):
-    """Текст без HTML и шорткодов, сущности раскрыты, пробелы схлопнуты."""
-    text = RE_SHORTCODE.sub('', strip_tags(value or ''))
-    return ' '.join(html.unescape(text).split())
+RE_BREAKS = re.compile(r'<br\s*/?>|</p\s*>|</div\s*>|</li\s*>', re.I)
+POEM_SLUG = 'stihi'
+POEM_LINES = 4
+
+
+def _lines(value):
+    """Текст по строкам: <br> и абзацы — переносы, без HTML и шорткодов, пробелы внутри строки
+    схлопнуты, пустые строки по краям убраны, подряд — не больше одной (граница строф)."""
+    text = RE_BREAKS.sub('\n', value or '')
+    text = html.unescape(RE_SHORTCODE.sub('', strip_tags(text)))
+    lines = [' '.join(line.split()) for line in text.replace('\r', '').split('\n')]
+    out = []
+    for line in lines:
+        if line or (out and out[-1]):
+            out.append(line)
+    while out and not out[-1]:
+        out.pop()
+    return out
+
+
+def _cut(text, chars):
+    """Не длиннее chars: по границе строки, если влезает хоть одна, иначе — по слову, с «…»."""
+    if len(text) <= chars:
+        return text
+    head = text[:chars]
+    nl = head.rfind('\n')
+    if nl > 0:
+        return head[:nl].rstrip() + '…'
+    return Truncator(text).chars(chars)
+
+
+def _is_poem(p):
+    return any(c.slug == POEM_SLUG for c in getattr(p, 'v2_category', []))
 
 
 def _excerpt(p):
-    """Превью карточки — те же правила, что у шаблона (preview|striptags|strip_shortcodes|truncatechars:240
-    или Post.get_excerpt: абзацы — переносами, 40 слов, не длиннее 300 символов)."""
-    if p.preview:
-        return Truncator(_plain(p.preview)).chars(240)
-    text = (p.content or '').replace('<br>', '\n').replace('<br />', '\n').replace('<p>', '').replace('</p>', '\n')
-    text = RE_SHORTCODE.sub('', strip_tags(RE_ENTITY.sub(' ', text)))
-    text = Truncator(text).words(40, truncate=' ...')
-    text = re.sub(r'[\n\r]+', '\n', text)
-    return Truncator(text).chars(300).strip()
+    """Превью карточки с переносами строк (на сайте .post-excerpt — white-space: pre-line):
+    preview — как ввёл автор, до 240 символов; без preview стихи — первые 4 строки текста
+    (до 300 символов), остальное — как Post.get_excerpt: 40 слов, до 300 символов."""
+    if (p.preview or '').strip():
+        return _cut('\n'.join(_lines(p.preview)), 240)
+    lines = _lines(p.content)
+    if _is_poem(p):
+        # стихи — первые 4 строки (пустые между строфами не считаем)
+        return _cut('\n'.join([line for line in lines if line][:POEM_LINES]), 300)
+    text = Truncator('\n'.join(lines)).words(40, truncate=' ...')
+    return _cut(re.sub(r'\n{2,}', '\n', text), 300)
 
 
 # ── автор ──────────────────────────────────────────────────────────────────
@@ -228,6 +258,7 @@ def cards(posts, mode, sites, user, pinned=False):
                 'from_cm': bool(p.from_cm),
                 'drugs_notice': p.drugs_notice in ('text', 'text_icon'),
                 'is_pinned': bool(p.is_pinned),
+                'is_poem': _is_poem(p),  # стихи: класс poem у карточки, как в старом шаблоне
             },
             'counts': {
                 'likes': likes.get(p.id, 0),

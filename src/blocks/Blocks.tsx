@@ -253,21 +253,27 @@ function Widget1({ block }: { block: Widget1Block }) {
           <a href={block.url}>{block.title}</a>
         </h2>
       </div>
-      {block.posts.map((p) => (
-        <a key={p.url} href={p.url} className="widget-1-item toggle-d">
-          <div className="w1i-head">
-            <img className="av" src={p.author.avatar || NO_AVATAR} alt={p.author.username} />
-            <span className="name">{displayName(p.author)}</span>
-            <span className="dt" title={formatFullDate(p.date)}>
-              {formatDate(p.date)}
-            </span>
-          </div>
-          <h3>{p.title}</h3>
-        </a>
-      ))}
+      {/* работы конкурса: аватар, название (до двух строк), «автор · дата» */}
+      <ul className="alp-w1-list toggle-d">
+        {block.posts.map((p) => (
+          <li key={p.url}>
+            <a href={p.url} className="alp-w1-item">
+              <img className="alp-w1-av" src={p.author.avatar || NO_AVATAR} alt="" />
+              <span className="alp-w1-body">
+                <span className="alp-w1-title">{p.title}</span>
+                <span className="alp-w1-meta">
+                  <span className="alp-w1-author">{displayName(p.author)}</span>
+                  {' · '}
+                  <span title={formatFullDate(p.date)}>{formatDate(p.date)}</span>
+                </span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
       {block.more_count > 1 && (
-        <a className="widget-1-link toggle-d" href={block.url}>
-          Ещё креативов: {block.more_count}
+        <a className="post-action alp-w1-more toggle-d-f" href={block.url}>
+          Ещё {block.more_count} {plural(block.more_count, 'работа', 'работы', 'работ')}
         </a>
       )}
     </article>

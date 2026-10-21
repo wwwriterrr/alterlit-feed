@@ -1,7 +1,7 @@
 # Лента постов v2 — остров React (главная, затем рубрики и разделы). Бэк — api/feed/, параллельно
 # старому (archive POST method=get-posts, postinger, Post.get_posts не трогаем).
 #
-# Перенесено: главная Альтерлита, Литпоток, рубрики (в том числе «Конкурсы» целиком), рецензии на
+# Перенесено: главная Альтерлита, Литпоток, рубрики (в том числе «Конкурсы» целиком), Избранное, рецензии на
 # публикацию, лента профиля и рецензии профиля.
 #
 #   GET /api/v1/feed/?section=index               — первая страница + блоки над лентой + права смотрящего
@@ -9,6 +9,7 @@
 #   GET /api/v1/feed/?section=category:litpotok   — Литпоток (/archive/category/litpotok/): стихи и проза
 #   GET /api/v1/feed/?section=category:<slug>     — рубрика /archive/category/<slug>/;
 #                                                   category:konkursy — все подрубрики «Конкурсов»
+#   GET /api/v1/feed/?section=favorites           — Избранное (/archive/favorites/all/): опубликованные is_gold
 #   GET /api/v1/feed/?section=reviews:<post_id>   — рецензии на публикацию (/archive/reviews/<id>/)
 #   GET /api/v1/feed/?section=profile:<username>  — публикации пользователя (/profile/<username>/):
 #       свой профиль — все статусы, кроме «отказано», и отложенные; is_staff в чужом — «опубликовано»,
@@ -56,6 +57,7 @@
     category:<slug>    — рубрика /archive/category/<slug>/;
     category:litpotok  — Литпоток (/archive/category/litpotok/): стихи и проза; то же — litpotok;
     category:konkursy  — все подрубрики «Конкурсов» (parent = konkursy) и сама рубрика;
+    favorites          — Избранное (/archive/favorites/all/): опубликованные с is_gold;
     reviews:<post_id>  — рецензии на публикацию (/archive/reviews/<post_id>/);
     profile:<username> — публикации пользователя (/profile/<username>/), статусы — по смотрящему;
     profile:<username>:reviews — его рецензии (/profile/<username>/?posts=reviews).
@@ -200,6 +202,9 @@ def get_section(name, mode, user=None):
         if len(parts) not in (2, 3) or not parts[1] or (len(parts) == 3 and parts[2] != 'reviews'):
             return None
         return _profile_section(name, parts[1], len(parts) == 3, sites, user)
+    if name == 'favorites':
+        return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
+                       where=lambda: Q(is_gold=True), title='Избранное')
     if name in ('litpotok', 'category:litpotok'):
         return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
                        where=lambda: Q(_in_categories(LITPOTOK_CATEGORIES)), title='Литпоток')
@@ -358,25 +363,55 @@ def _mem_image(img):
 
 
 RE_SHORTCODE = re.compile(r'/\*(?:vote|audio|file|preorder)-\d+\*/')
-RE_ENTITY = re.compile(r'&[\w#]+;')
 
 
-def _plain(value):
-    """Текст без HTML и шорткодов, сущности раскрыты, пробелы схлопнуты."""
-    text = RE_SHORTCODE.sub('', strip_tags(value or ''))
-    return ' '.join(html.unescape(text).split())
+RE_BREAKS = re.compile(r'<br\s*/?>|</p\s*>|</div\s*>|</li\s*>', re.I)
+POEM_SLUG = 'stihi'
+POEM_LINES = 4
+
+
+def _lines(value):
+    """Текст по строкам: <br> и абзацы — переносы, без HTML и шорткодов, пробелы внутри строки
+    схлопнуты, пустые строки по краям убраны, подряд — не больше одной (граница строф)."""
+    text = RE_BREAKS.sub('\n', value or '')
+    text = html.unescape(RE_SHORTCODE.sub('', strip_tags(text)))
+    lines = [' '.join(line.split()) for line in text.replace('\r', '').split('\n')]
+    out = []
+    for line in lines:
+        if line or (out and out[-1]):
+            out.append(line)
+    while out and not out[-1]:
+        out.pop()
+    return out
+
+
+def _cut(text, chars):
+    """Не длиннее chars: по границе строки, если влезает хоть одна, иначе — по слову, с «…»."""
+    if len(text) <= chars:
+        return text
+    head = text[:chars]
+    nl = head.rfind('\n')
+    if nl > 0:
+        return head[:nl].rstrip() + '…'
+    return Truncator(text).chars(chars)
+
+
+def _is_poem(p):
+    return any(c.slug == POEM_SLUG for c in getattr(p, 'v2_category', []))
 
 
 def _excerpt(p):
-    """Превью карточки — те же правила, что у шаблона (preview|striptags|strip_shortcodes|truncatechars:240
-    или Post.get_excerpt: абзацы — переносами, 40 слов, не длиннее 300 символов)."""
-    if p.preview:
-        return Truncator(_plain(p.preview)).chars(240)
-    text = (p.content or '').replace('<br>', '\n').replace('<br />', '\n').replace('<p>', '').replace('</p>', '\n')
-    text = RE_SHORTCODE.sub('', strip_tags(RE_ENTITY.sub(' ', text)))
-    text = Truncator(text).words(40, truncate=' ...')
-    text = re.sub(r'[\n\r]+', '\n', text)
-    return Truncator(text).chars(300).strip()
+    """Превью карточки с переносами строк (на сайте .post-excerpt — white-space: pre-line):
+    preview — как ввёл автор, до 240 символов; без preview стихи — первые 4 строки текста
+    (до 300 символов), остальное — как Post.get_excerpt: 40 слов, до 300 символов."""
+    if (p.preview or '').strip():
+        return _cut('\n'.join(_lines(p.preview)), 240)
+    lines = _lines(p.content)
+    if _is_poem(p):
+        # стихи — первые 4 строки (пустые между строфами не считаем)
+        return _cut('\n'.join([line for line in lines if line][:POEM_LINES]), 300)
+    text = Truncator('\n'.join(lines)).words(40, truncate=' ...')
+    return _cut(re.sub(r'\n{2,}', '\n', text), 300)
 
 
 # ── автор ──────────────────────────────────────────────────────────────────
@@ -477,6 +512,7 @@ def cards(posts, mode, sites, user, pinned=False):
                 'from_cm': bool(p.from_cm),
                 'drugs_notice': p.drugs_notice in ('text', 'text_icon'),
                 'is_pinned': bool(p.is_pinned),
+                'is_poem': _is_poem(p),  # стихи: класс poem у карточки, как в старом шаблоне
             },
             'counts': {
                 'likes': likes.get(p.id, 0),
