@@ -54,7 +54,7 @@
 
 Имя раздела (параметр section):
     index              — главная Альтерлита (как postinger в archive(type="index"));
-    category:<slug>    — рубрика /archive/category/<slug>/;
+    category:<slug>    — рубрика /archive/category/<slug>/ (вместо slug может быть id рубрики);
     category:litpotok  — Литпоток (/archive/category/litpotok/): стихи и проза; то же — litpotok;
     category:konkursy  — все подрубрики «Конкурсов» (parent = konkursy) и сама рубрика;
     favorites          — Избранное (/archive/favorites/all/): опубликованные с is_gold;
@@ -142,15 +142,19 @@ SECTIONS = {
 
 
 def _category_section(name, slug, mode):
-    """Рубрика по slug. Картиночные рубрики (родитель «images») — это /archive/images/, не посты."""
+    """Рубрика по slug или id: /archive/category/stihi/ и /archive/category/65/ (так, по id,
+    ссылается «Виджет 1»). Сначала slug — вдруг у рубрики числовой slug, потом id.
+    Картиночные рубрики (родитель «images») — это /archive/images/, не посты."""
     from blog.models import Category
     sites = SITES.get(mode, SITES['alterlit'])
-    cat = (Category.objects.select_related('parent')
-           .filter(slug=slug, site__in=sites).first())
-    if cat is None or (cat.parent_id and cat.parent.slug == 'images') or slug == 'images':
+    found = Category.objects.select_related('parent').filter(site__in=sites)
+    cat = found.filter(slug=slug).first()
+    if cat is None and slug.isdigit():
+        cat = found.filter(id=int(slug)).first()
+    if cat is None or cat.slug == 'images' or (cat.parent_id and cat.parent.slug == 'images'):
         raise SectionNotFound('Рубрика не найдена')
     ids = [cat.id]
-    if slug in PARENT_SECTIONS:
+    if cat.slug in PARENT_SECTIONS:
         ids += list(Category.objects.filter(parent=cat).values_list('id', flat=True))
     return Section(name, sites=sites, post_types=FEED_POST_TYPES, statuses=ARCHIVE_STATUSES,
                    where=lambda: Q(_in_categories(ids)), title=cat.title)
