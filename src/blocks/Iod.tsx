@@ -4,6 +4,11 @@ import s from './Iod.module.css';
 import { IMAGE_CLOSED_EVENT, openImage } from '../viewer';
 
 const GALLERY = '/archive/images/image_of_day/';
+/** Самый высокий блок — 3:4: очень вытянутая вертикаль впишется, по бокам будет фон. */
+const STAGE_MIN_RATIO = 3 / 4;
+/** Пропорции картинки: по размерам с бэка, иначе — как у DayimageThumbnail (430×532). */
+const ratioOf = (img: { width?: number; height?: number }) =>
+  img.width && img.height ? img.width / img.height : 430 / 532;
 /** Через сколько бездействия листать вперёд. */
 const AUTOPLAY_MS = 10_000;
 /** Сдвиг мышью, после которого это перетаскивание, а не клик. */
@@ -43,6 +48,14 @@ export default function Iod({ block }: { block: IodBlock }) {
   const items = block.items;
   const n = items.length;
   const ids = items.map((i) => i.id);
+  // высота блока — по самой высокой картинке (наименьшее отношение ширины к высоте),
+  // но не выше 3:4; остальные — по центру. Без размеров — прежние пропорции 430:532
+  const stageRatio = Math.max(STAGE_MIN_RATIO, Math.min(...items.map(ratioOf)));
+  const [loaded, setLoaded] = useState<Set<number>>(() => new Set());
+  const markLoaded = useCallback(
+    (id: number) => setLoaded((set) => (set.has(id) ? set : new Set(set).add(id))),
+    [],
+  );
   const touch = useCallback(() => setActivity((a) => a + 1), []);
   // счётчик «2 / 4» виден при наведении; на телефоне (наведения нет) — коротко после действия
   const [flash, setFlash] = useState(false);
@@ -172,7 +185,12 @@ export default function Iod({ block }: { block: IodBlock }) {
         </h2>
       </div>
 
-      <div className={s.stage} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <div
+        className={s.stage}
+        style={{ aspectRatio: stageRatio }}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+      >
         <div
           ref={track}
           className={s.track}
@@ -198,20 +216,28 @@ export default function Iod({ block }: { block: IodBlock }) {
               aria-label={`${i + 1} из ${n}`}
               aria-hidden={i !== index}
             >
-              {/* размытое превью — фон под вписанной картинкой */}
-              <span className={s.backdrop} style={{ backgroundImage: `url(${img.preload})` }} aria-hidden="true" />
-              <img
-                id={`image-${img.id}`}
-                className={s.img}
-                src={img.src}
-                onClick={() => {
-                  setViewing(true);
-                  openImage(img.id, ids, img.href);
-                }}
-                alt={img.descr || `Картинка дня ${i + 1}`}
-                loading={i === 0 ? 'eager' : 'lazy'}
-                draggable={false}
-              />
+              {/* рамка ровно пропорций картинки, по центру слайда; за ней — фон карточки */}
+              <span className={s.frame} style={{ aspectRatio: ratioOf(img) }} data-loaded={loaded.has(img.id) || undefined}>
+                {/* пока грузится — размытое мини-превью тех же пропорций */}
+                <img className={s.placeholder} src={img.preload} alt="" aria-hidden="true" draggable={false} />
+                <img
+                  id={`image-${img.id}`}
+                  className={s.img}
+                  src={img.src}
+                  onLoad={() => markLoaded(img.id)}
+                  // из кэша браузера картинка может загрузиться раньше, чем повесится onLoad
+                  ref={(el) => {
+                    if (el?.complete && el.naturalWidth) markLoaded(img.id);
+                  }}
+                  onClick={() => {
+                    setViewing(true);
+                    openImage(img.id, ids, img.href);
+                  }}
+                  alt={img.descr || `Картинка дня ${i + 1}`}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  draggable={false}
+                />
+              </span>
               {img.descr && <figcaption className={s.caption}>{img.descr}</figcaption>}
             </figure>
           ))}

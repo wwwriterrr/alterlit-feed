@@ -590,21 +590,34 @@ def _announcements(spec):
 IOD_CATEGORY = 5  # «Картинка дня»
 
 
+def _iod_item(i, mode):
+    """Слайд картинки дня. Есть размеры (images_patch.py) — превью image_card (WEBP, пропорции
+    оригинала, прозрачность сохраняется) и размытое мини-превью тех же пропорций; клиент задаёт
+    высоту блока по самой высокой картинке. Нет — как раньше: DayimageThumbnail."""
+    w, h = getattr(i, 'width', None), getattr(i, 'height', None)
+    gif = i.image.name.lower().endswith('.gif')
+    item = {
+        'id': i.id,
+        'full': i.image.url,
+        'href': reverse('archive', kwargs={'type': 'image', 'object_id': i.id}),
+        'descr': Truncator(i.descr).chars(140) if (i.descr and mode == 'alterlit') else '',
+    }
+    if w and h:
+        card = i.image if gif or not hasattr(i, 'image_card') else i.image_card
+        item.update(width=w, height=h, src=card.url, preload=i.full_preload_webp_url)
+    else:
+        item.update(src=i.dayimage_thumbnail(), preload=i.image_preload.url)
+    return item
+
+
 def _iod(mode):
     """4 последние картинки рубрики «Картинка дня» (запланированные на будущее — не показываем)."""
     items = list(PostImages.objects
                  .filter(category__id=IOD_CATEGORY, date_created__lte=tz.now())
-                 .only('image', 'descr', 'date_created').order_by('-date_created')[:4])
+                 .order_by('-date_created')[:4])
     if not items:
         return None
-    return {'type': 'iod', 'items': [{
-        'id': i.id,
-        'src': i.dayimage_thumbnail(),
-        'full': i.image.url,
-        'preload': i.image_preload.url,
-        'href': reverse('archive', kwargs={'type': 'image', 'object_id': i.id}),
-        'descr': Truncator(i.descr).chars(140) if (i.descr and mode == 'alterlit') else '',
-    } for i in items]}
+    return {'type': 'iod', 'items': [_iod_item(i, mode) for i in items]}
 
 
 EARS_LIMIT = 6

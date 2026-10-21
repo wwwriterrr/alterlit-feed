@@ -92,7 +92,17 @@ export interface AnnouncementsBlock {
 
 export interface IodBlock {
   type: 'iod';
-  items: { id: number; src: string; full: string; preload: string; href: string; descr: string }[];
+  /** width/height — размеры картинки: блок по самой высокой, остальные по центру */
+  items: {
+    id: number;
+    src: string;
+    full: string;
+    preload: string;
+    href: string;
+    descr: string;
+    width?: number;
+    height?: number;
+  }[];
 }
 
 export interface EarsBlock {
